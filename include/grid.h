@@ -26,16 +26,22 @@ private:
 
     void m_updateSegment(vec2i min, vec2i max);
     void m_drawSegment(vec2i min, vec2i max, window_t& rw);
-    void m_redrawSegment(AABBi redraw_window, AABBi view_window, window_t& rw);
 public:
-    size_t time_step = 1;
+    void m_redrawSegment(AABBi redraw_window, AABBi view_window, window_t& rw);
     std::vector<AABBi> m_ChangedSectors;
+
+    size_t time_step = 1;
     inline bool inBounds(int x, int y) {
         return x >= 0 && y >= 0 && x < m_width && y < m_height;
     }
     inline bool inBounds(vec2i v) {
         return inBounds(v.x, v.y);
     }
+    inline AABBi getDefaultViewWindow() {
+        return { vec2i(0, 0), vec2i(m_width, m_height) };
+    }
+
+
     inline const CellVar& get(int x, int y) {
         if(!inBounds(x, y))
             exit(1);
@@ -67,16 +73,18 @@ public:
 
     void redrawChangedSegments(window_t& rw, AABBi view_window);
     inline void redrawChangedSegment(window_t& rw) {
-        redrawChangedSegments(rw, {vec2i(0, 0), vec2i(m_width, m_height)});
+        redrawChangedSegments(rw, getDefaultViewWindow());
     }
 
     inline void draw(window_t& rw) {
-        m_drawSegment({0, 0}, {(int)m_width - 1, (int)m_height - 1}, rw);
+        auto t = getDefaultViewWindow();
+        m_drawSegment(t.min, t.max, rw);
     }
     inline void update() {
+        auto t = getDefaultViewWindow();
         for(int i = 0; i < time_step; i++){
             tick_passed_total++;
-            m_updateSegment({0, 0}, {(int)m_width - 1, (int)m_height - 1});
+            m_updateSegment(t.min, t.max);
         }
     }
 

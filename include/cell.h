@@ -6,7 +6,7 @@
 
 class Grid;
 
-enum eCellType {
+enum class eCellType {
     //gases
     Air,
     Smoke,
@@ -96,7 +96,7 @@ public:
         }Crystal;
     }var;
 
-    const CellConstants& getProperty() {
+    const CellConstants& getProperty() const {
         return properties[type];
     }
     CellVar(eCellType type_) 

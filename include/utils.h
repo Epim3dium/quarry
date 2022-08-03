@@ -31,6 +31,13 @@ struct AABBi {
       float dy = std::max(abs(min.y - y), abs(y - max.y));
       return sqrt(dx*dx + dy*dy);
     }
+    void update_to_contain(const vec2i& v) {
+        min.x = std::min(min.x, v.x);
+        min.y = std::min(min.y, v.y);
+
+        max.x = std::max(max.x, v.x);
+        max.y = std::max(max.y, v.y);
+    }
 };
 
 bool intersects(const AABBi& a, const AABBi& b);

@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "grid.h"
 #include "timer.h"
+#include "entity_player.h"
 
 #define WW 2048.f
 #define WH 2048.f
@@ -22,7 +23,12 @@ int main()
 {
     InitializeProperties();
 
+    vec2i player_input = {0, 0};
+    Player player(&player_input);
+
     Grid grid(GWW, GWH);
+    player.pos = vec2f((float)GWW / 2, 10);
+    
     int brush_size = DEFAULT_BRUSH_SIZE;
     //body.child = std::make_unique<stem_seg_t>(stem_seg_t({200.f, 200.f}, 0.f, 100.f, &body));
 
@@ -43,6 +49,7 @@ int main()
     float fps_sum = 0;
     size_t fps_count = 0;
 
+    //needed to avoid flickering caused by sfml's double buffering
     grid.draw(window);
     window.display();
     grid.draw(window);
@@ -94,12 +101,24 @@ int main()
         SpawnIfEmpty(sf::Keyboard::X, eCellType::Stone);
         SpawnIfEmpty(sf::Keyboard::C, eCellType::Crystal);
 
+        player_input = {0, 0};
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
+            player_input.y = 1;
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
+            player_input.y = -1;
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
+            player_input.x = -1;
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
+            player_input.x = 1;
 
         //grid.drawSegment({0, 0}, {GWW, GWH}, window);
         //grid.redrawSegment({{0, 0}, {GWW/2, GWH/2}}, {GWW, GWH}, window);
         grid.redrawChangedSegment(window);
         //grid.updateSegment({0, 0}, {GWW, GWH});
         grid.updateChangedSegments();
+        player.update(grid);
+        player.draw(grid.getDefaultViewWindow(), grid, window);
+
         if(show_updated_segments){
             clr_t color(255, 0, 255, 50);
             for(auto& cur : grid.m_ChangedSectors) {
