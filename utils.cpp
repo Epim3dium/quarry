@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "entity_player.h"
 
 float angle(vec2f a, vec2f b) {
     vec2f d = b - a;
@@ -11,3 +12,4 @@ bool intersects(const AABBi& a, const AABBi& b) {
     return (a.min.x < b.max.x && a.max.x > b.min.x) &&
              (a.min.y < b.max.y && a.max.y > b.min.y);
 }
+const GridSprite Player::sprite("./assets/player.png");

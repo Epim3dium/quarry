@@ -1,5 +1,6 @@
 #include "grid.h"
 #include "timer.h"
+#include "grid_sprite.h"
 
 void Grid::set(int x, int y, const CellVar& cv) {
         AABBi* cur_sector = nullptr;
@@ -146,21 +147,24 @@ void Grid::drawCellAt(int x, int y, AABBi view_window, clr_t color, window_t& rw
     t.setPosition({(x - view_window.min.x) * seg_size.x, (float)size.y - (y - view_window.min.y) * seg_size.y});
     rw.draw(t);
 }
-void Grid::drawCellVecAt(const std::vector<std::pair<vec2i, clr_t>>& vec, const AABBi& view_window, window_t& rw) {
+void Grid::drawSpriteAt(const GridSprite& sprite, vec2i pos, const AABBi& view_window, window_t& rw) {
     vec2i grid_size = view_window.size();
 
     vec2u size = rw.getSize();
     vec2f seg_size;
     seg_size.x = (float)size.x / (float)(grid_size.x);
     seg_size.y = (float)size.y / (float)(grid_size.y);
-    for(auto [v, clr] : vec) {
-        v.x = std::clamp<int>(v.x, 0, m_width);
-        v.y = std::clamp<int>(v.y, 0, m_height);
 
-        sf::RectangleShape t(seg_size);
-        t.setFillColor(clr);
-        t.setPosition({(v.x - view_window.min.x) * seg_size.x, (float)size.y - (v.y - view_window.min.y) * seg_size.y});
-        rw.draw(t);
+    int w = sprite.getWidth();
+    int h = sprite.getHeight();
+
+    for(int y = 0; y < h; y++) {
+        for(int x = 0; x < w; x++) {
+            sf::RectangleShape t(seg_size);
+            t.setFillColor(sprite.getPixels()[x + y * w]);
+            t.setPosition({(pos.x + x - view_window.min.x) * seg_size.x, (float)size.y - (pos.y + h - y - 1 - view_window.min.y) * seg_size.y});
+            rw.draw(t);
+        }
     }
 }
 void Grid::m_drawSegment(vec2i min, vec2i max, window_t& rw) {

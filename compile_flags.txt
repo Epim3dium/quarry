@@ -8,3 +8,4 @@
 -lsfml-graphics
 -lsfml-window
 -lsfml-system
+-Wno-unused-command-line-argument

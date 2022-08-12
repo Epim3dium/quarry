@@ -3,10 +3,14 @@ DEPS=include/$(wildcard *.h)
 
 CFLAGS=@compile_flags.txt
 
-OBJ=build/main.o build/utils.o build/cell.o build/grid.o
+OBJ=main.o utils.o cell.o grid.o lodepng.o
 
-build/%.o: %.cpp $(DEPS)
+%.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 main.exe: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS)
+
+clean:
+	rm -f $(wildcard *.o)
+	rm -f main.exe

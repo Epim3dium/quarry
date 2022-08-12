@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "cell.h"
 
+class GridSprite;
 
 class Grid {
 private:
@@ -68,7 +69,7 @@ public:
     inline void drawCellAt(int x, int y, clr_t color, window_t& rw) {
         drawCellAt(x, y, { vec2i(0, 0), vec2i(m_width, m_height) }, color, rw);
     }
-    void drawCellVecAt(const std::vector<std::pair<vec2i, clr_t>>& vec, const AABBi& view_window, window_t& rw);
+    void drawSpriteAt(const GridSprite& sprite, vec2i where, const AABBi& view_window, window_t& rw);
 
     void updateChangedSegments();
 

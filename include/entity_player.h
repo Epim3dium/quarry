@@ -1,4 +1,5 @@
 #include "entity.h"
+#include "grid_sprite.h"
 #include "timer.h"
 
 class Player : public Entity {
@@ -10,6 +11,8 @@ class Player : public Entity {
     const float repel_leg_vel = 0.1f;
     const float gravity_force = 0.1f;
     const float max_vert_speed = 2.f;
+    const vec2i size = vec2i(3, 9);
+    static const GridSprite sprite;
 
     //needed 2 of last pos for both render buffers of sfml to redraw last occupied positions 
     vec2f m_last_pos[2];
@@ -54,30 +57,18 @@ public:
     }
     void draw(const AABBi& view_window, Grid& grid, window_t& rw) override {
         epi::timer::scope timer("player_draw");
-        //grouping pixels needed to be displayed
-        std::vector<std::pair<vec2i, clr_t>> pixels;
         //grouping old pixels that should be cleared
-        std::vector<std::pair<vec2i, clr_t>> dark_pixels;
-        auto drawAtOffset = [&](vec2i v, clr_t color) {
-            auto t = vec2i(m_last_pos[1].x + v.x, m_last_pos[1].y + v.y);
-            pixels.push_back(std::make_pair(vec2i(pos) + v, color));
-            if(grid.inBounds(t) && t != vec2i(pos) + v)
-                dark_pixels.push_back(std::make_pair(t, grid.get(t).color));
-        };
-        auto skin_color = clr_t(255,219,172);
-        //drawing 'head'
-        drawAtOffset(vec2i(1, 0), skin_color);
-        drawAtOffset(vec2i(-1, 0), skin_color);
-        drawAtOffset(vec2i(0, 1), skin_color);
-        drawAtOffset(vec2i(0, -1), skin_color);
-
-        //drawing 'body'
-        for(int y = -5; y != -1; y++)
-            for(int x = -1; x != 2; x++)
-                drawAtOffset({x, y}, clr_t(255, 0, 0));
+        GridSprite background(size.x, size.y);
+        vec2i grid_offset = vec2i(-size.x / 2, -size.y + 1);
+        for(int y = 0; y < sprite.getHeight(); y++) {
+            for(int x = 0; x < sprite.getWidth(); x++) {
+                if(grid.inBounds(vec2i(m_last_pos[1]) + vec2i(x, y) + grid_offset))
+                    background.set(x, y, grid.get(vec2i(m_last_pos[1]) + vec2i(x, y) + grid_offset).color);
+            }
+        }
         //drawing pixel buffer
-        grid.drawCellVecAt(dark_pixels, view_window, rw);
-        grid.drawCellVecAt(pixels, view_window, rw);
+        grid.drawSpriteAt(background, vec2i(m_last_pos[1]) + grid_offset, view_window, rw);
+        grid.drawSpriteAt(sprite, vec2i(pos) + grid_offset, view_window, rw);
     }
 
     Player(vec2i* move_input) : Entity(eEntityType::Humanoid), m_move_input(move_input) 

@@ -10,7 +10,7 @@
 #define WW 2048.f
 #define WH 2048.f
 
-#define GWW 256
+#define GWW 256 
 #define GWH 256
 
 #define DEFAULT_BRUSH_SIZE 3
@@ -26,7 +26,7 @@ int main()
 
     vec2i player_input = {0, 0};
     std::vector<Player> player_swarm;
-    for(int i = 1; i < 10; i++) {
+    for(int i = 1; i < 2; i++) {
         player_swarm.push_back(&player_input);
         player_swarm.back().pos = vec2f{(float)GWW / 10 * i, 10};
     }
@@ -39,6 +39,7 @@ int main()
 
     sf::RenderWindow window(sf::VideoMode(WW, WH), "SFML works!");
     window.setFramerateLimit(60);
+
     const auto& SpawnIfEmpty = [&](sf::Keyboard::Key k, eCellType type) {
         if(sf::Keyboard::isKeyPressed(k)){
             auto ture_coords = grid.convert_coords(sf::Mouse::getPosition(window), window); 
@@ -59,6 +60,7 @@ int main()
     window.display();
     grid.draw(window);
 
+    std::flush(std::cout);
     while (window.isOpen()) {
         sf::Event event;
         start = std::chrono::high_resolution_clock::now();
@@ -66,6 +68,9 @@ int main()
         {
             if (event.type == sf::Event::Closed)
                 window.close();
+            if(event.key.code == sf::Keyboard::Escape) {
+                window.close();
+            }
             if(event.type == sf::Event::KeyPressed) {
                 if(event.key.code == sf::Keyboard::Q) {
                     auto t = brush_size;
@@ -158,9 +163,9 @@ int main()
             fps_count++;
             if(sec_clock.getElapsedTime().asSeconds() > 3.f) {
                 sec_clock.restart();
-                std::cerr << "[FPS]: " << fps_sum/fps_count << "\n";
-                std::cerr << "[grid]: " << epi::timer::Get("grid").ms() << "\t[player]: " << epi::timer::Get("player").ms() << "\n";
-                std::cerr << "{player}: update): " << epi::timer::Get("player_update").ms() << "\tdraw): " << epi::timer::Get("player_draw").ms() << "\n";
+                std::cout << "[FPS]: " << fps_sum/fps_count << "\n";
+                std::cout << "[grid]: " << epi::timer::Get("grid").ms() << "\t[player]: " << epi::timer::Get("player").ms() << "\n";
+                std::cout << "{player}: update): " << epi::timer::Get("player_update").ms() << "\tdraw): " << epi::timer::Get("player_draw").ms() << "\n";
                 epi::timer::clearTimers();
                 fps_sum = 0;
                 fps_count = 0;
