@@ -16,7 +16,8 @@
 #define DEFAULT_BRUSH_SIZE 3
 
 
-const bool show_updated_segments = false;
+const bool show_updated_segments = true;
+const float updated_segments_opacity = 127;
 const bool print_fps = true;
 
 int main()
@@ -24,10 +25,14 @@ int main()
     InitializeProperties();
 
     vec2i player_input = {0, 0};
-    Player player(&player_input);
+    std::vector<Player> player_swarm;
+    for(int i = 1; i < 10; i++) {
+        player_swarm.push_back(&player_input);
+        player_swarm.back().pos = vec2f{(float)GWW / 10 * i, 10};
+    }
 
     Grid grid(GWW, GWH);
-    player.pos = vec2f((float)GWW / 2, 10);
+    //player.pos = vec2f((float)GWW / 2, 10);
     
     int brush_size = DEFAULT_BRUSH_SIZE;
     //body.child = std::make_unique<stem_seg_t>(stem_seg_t({200.f, 200.f}, 0.f, 100.f, &body));
@@ -111,16 +116,21 @@ int main()
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
             player_input.x = 1;
 
-        //grid.drawSegment({0, 0}, {GWW, GWH}, window);
-        //grid.redrawSegment({{0, 0}, {GWW/2, GWH/2}}, {GWW, GWH}, window);
-        grid.redrawChangedSegment(window);
-        //grid.updateSegment({0, 0}, {GWW, GWH});
-        grid.updateChangedSegments();
-        player.update(grid);
-        player.draw(grid.getDefaultViewWindow(), grid, window);
+        {
+            epi::timer::scope timer("grid");
+            grid.redrawChangedSegment(window);
+            grid.updateChangedSegments();
+        }
+        {
+            epi::timer::scope timer("player");
+            for(auto& player : player_swarm) {
+                player.update(grid);
+                player.draw(grid.getDefaultViewWindow(), grid, window);
+            }
+        }
 
         if(show_updated_segments){
-            clr_t color(255, 0, 255, 50);
+            clr_t color(255, 0, 255, updated_segments_opacity);
             for(auto& cur : grid.m_ChangedSectors) {
                 for(int x = cur.min.x; x < cur.max.x; x++) {
                     int y = cur.max.y - 1;
@@ -149,6 +159,9 @@ int main()
             if(sec_clock.getElapsedTime().asSeconds() > 3.f) {
                 sec_clock.restart();
                 std::cerr << "[FPS]: " << fps_sum/fps_count << "\n";
+                std::cerr << "[grid]: " << epi::timer::Get("grid").ms() << "\t[player]: " << epi::timer::Get("player").ms() << "\n";
+                std::cerr << "{player}: update): " << epi::timer::Get("player_update").ms() << "\tdraw): " << epi::timer::Get("player_draw").ms() << "\n";
+                epi::timer::clearTimers();
                 fps_sum = 0;
                 fps_count = 0;
             }
