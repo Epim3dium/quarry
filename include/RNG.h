@@ -2,6 +2,7 @@
 #include <time.h>
 #include <chrono>
 #include <random>
+#include <initializer_list>
 
 /* used to create random numbers using random int distribution
  * * uses hashed time as seed value by default
@@ -29,6 +30,11 @@ public:
     T Random(T low, T high) {
         T diff = high - low;
         return low + (T)((float)diff * Random());
+    }
+    template<class T>
+    T Random(std::initializer_list<T> list) {
+        size_t idx = this->Random<size_t>(0, list.size());
+        return *(list.begin() + idx);
     }
 	RNG(float seed = 0) {
         if(seed == 0) {

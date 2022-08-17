@@ -158,11 +158,13 @@ void Grid::drawSpriteAt(const GridSprite& sprite, vec2i pos, const AABBi& view_w
     int w = sprite.getWidth();
     int h = sprite.getHeight();
 
+    pos -= {w/2, h/2};
+
     for(int y = 0; y < h; y++) {
         for(int x = 0; x < w; x++) {
             sf::RectangleShape t(seg_size);
-            t.setFillColor(sprite.getPixels()[x + y * w]);
-            t.setPosition({(pos.x + x - view_window.min.x) * seg_size.x, (float)size.y - (pos.y + h - y - 1 - view_window.min.y) * seg_size.y});
+            t.setFillColor(sprite.get(x, y));
+            t.setPosition({(pos.x + x - view_window.min.x) * seg_size.x, (float)size.y - (pos.y + y - view_window.min.y) * seg_size.y});
             rw.draw(t);
         }
     }

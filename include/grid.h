@@ -20,6 +20,9 @@ private:
 
     std::vector<AABBi> m_SegmentsToRerender;
 
+    //returned when geet is out of bounds
+    CellVar null_obj = CellVar(eCellType::Bedrock);
+
     inline size_t m_idx(int x, int y) {
         return x + y * m_width;
     }
@@ -45,7 +48,7 @@ public:
 
     inline const CellVar& get(int x, int y) {
         if(!inBounds(x, y))
-            exit(1);
+            return null_obj;
         return m_plane[m_idx(x, y)];
     }
     inline const CellVar& get(vec2i v) {

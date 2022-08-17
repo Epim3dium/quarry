@@ -164,11 +164,10 @@ int main()
             if(sec_clock.getElapsedTime().asSeconds() > 3.f) {
                 sec_clock.restart();
                 std::cout << "[FPS]: " << fps_sum/fps_count << "\n";
-                std::cout << "[grid]: " << epi::timer::Get("grid").ms() << "\t[player]: " << epi::timer::Get("player").ms() << "\n";
-                std::cout << "{player}: update): " << epi::timer::Get("player_update").ms() << "\tdraw): " << epi::timer::Get("player_draw").ms() << "\n";
                 epi::timer::clearTimers();
                 fps_sum = 0;
                 fps_count = 0;
+                std::cout << "[player]:  pos: " << player_swarm.back().pos.x << "\t" << player_swarm.back().pos.y;
             }
         }
         window.display();

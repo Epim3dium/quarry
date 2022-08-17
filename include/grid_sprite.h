@@ -11,7 +11,7 @@ public:
     int getWidth() const { return m_width; }
     int getHeight() const { return m_height; }
     
-    const clr_t* getPixels() const {
+    clr_t* getPixels() {
         if(buffer.size() != 0)
             return &buffer[0];
         return nullptr;
@@ -41,6 +41,7 @@ public:
         static_assert(sizeof(unsigned char) == sizeof(sf::Uint8));
 
         if(!error) error = lodepng::decode(*(std::vector<unsigned char>*)&buffer, m_width, m_height, png);
+        std::reverse(buffer.begin(), buffer.end());
 
         //if there's an error, display it
         if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
