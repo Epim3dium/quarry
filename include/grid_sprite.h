@@ -3,19 +3,21 @@
 #include "lodepng.h"
 #include <iostream>
 
+class Grid;
+
 class GridSprite {
 
     unsigned int m_width, m_height;
     std::vector<clr_t> buffer;
 public:
-    int getWidth() const { return m_width; }
-    int getHeight() const { return m_height; }
-    
     clr_t* getPixels() {
         if(buffer.size() != 0)
             return &buffer[0];
         return nullptr;
     }
+    int getWidth() const { return m_width; }
+    int getHeight() const { return m_height; }
+    
     clr_t get(int x, int y) const { 
         return buffer[x + y * m_width]; 
     }
@@ -46,4 +48,5 @@ public:
         //if there's an error, display it
         if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
     }
+    friend Grid;
 };

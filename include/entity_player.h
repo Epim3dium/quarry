@@ -20,14 +20,15 @@ class Player : public Entity {
     GridSprite m_sprite;
 public:
     GridRigidbody m_rigidbody;
-    float speed = 0.05f;
+    float speed = 0.08f;
+    float jump_force = 8.f;
     void update(Grid& grid) override;
     void draw(const AABBi& view_window, Grid& grid, window_t& rw) override;
 
     Player(vec2i* move_input) : Entity(eEntityType::Humanoid), m_move_input(move_input), m_sprite(sprite) 
     {
         static RNG rng;
-        clr_t color = rng.Random({clr_t(128, 34, 42), clr_t(37, 94, 36), clr_t(55, 43, 161)});
+        clr_t color = rng.Random({clr_t(128, 34, 42), clr_t(37, 94, 36), clr_t(55, 83, 161)});
 
         for(clr_t* i = m_sprite.getPixels(); i < m_sprite.getPixels() + m_sprite.getWidth() * m_sprite.getHeight() * sizeof(clr_t); i++) {
             if(i->r == 255) {

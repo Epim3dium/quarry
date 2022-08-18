@@ -9,16 +9,9 @@ void Player::update(Grid& grid) {
         m_rigidbody.vel.x += float(m_move_input->x) * speed;
     }
     //check for ground under entity
-    m_grounded = false;
-    for(int i = this->pos.y; i >= this->pos.y - round((float)size.y / 2.f) - 1 && i >= 0; i--) {
-        auto& cur_prop = grid.get(this->pos.x, i).getProperty();
-        if(cur_prop.state == eState::Soild || cur_prop.state == eState::Powder) {
-            m_grounded = true;
-            break;
-        }
-    }
+    m_grounded = m_rigidbody.physics.last_side_collided.y == -1;
     if(m_move_input->y == 1 && m_grounded) {
-        m_rigidbody.vel.y += 10.f;
+        m_rigidbody.vel.y += jump_force;
     }
     m_rigidbody.update(this, grid);
 }

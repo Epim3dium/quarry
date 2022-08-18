@@ -6,7 +6,7 @@
 
 class Grid;
 
-enum class eCellType {
+enum class eCellType : unsigned char {
     //gases
     Air,
     Smoke,
@@ -23,6 +23,7 @@ enum class eCellType {
     //solids
     Stone,
     //special
+    Grass,
     Seed,
     Wood,
     Leaf,
@@ -79,8 +80,11 @@ public:
 
     union VarUnion {
         struct {
-            unsigned char BranchCount;
-            char AvGrowthLen;
+            unsigned short move_count;
+        } Water;
+        struct {
+            unsigned char branch_count;
+            char down_timer_len;
             struct Dir_t {
                 char x;
                 char y;
@@ -89,7 +93,13 @@ public:
             }Dir;
         }Wood;
         struct {
-            char CurGrowthLen;
+            unsigned char grass_timer;
+        }Dirt;
+        struct {
+            unsigned char down_timer_len;
+        }Grass;
+        struct {
+            unsigned char down_timer_len;
         }Leaf;
         struct {
             char CurSide;

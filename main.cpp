@@ -11,9 +11,9 @@
 #define WH 2048.f
 
 #define GWW 256 
-#define GWH 256
+#define GWH 256 
 
-#define DEFAULT_BRUSH_SIZE 3
+#define DEFAULT_BRUSH_SIZE (sqrt(GWW * GWH) / 32 / 2)
 
 
 const bool show_updated_segments = true;
@@ -61,6 +61,12 @@ int main()
     grid.draw(window);
 
     std::flush(std::cout);
+    auto ture_coords = vec2i(50, 50); 
+            for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
+                for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
+                    if(grid.inBounds(ture_coords + vec2i(x, y)) && grid.get(ture_coords + vec2i(x, y)).type == eCellType::Air)
+                        grid.set(ture_coords + vec2i(x, y), CellVar(eCellType::Water));
+
     while (window.isOpen()) {
         sf::Event event;
         start = std::chrono::high_resolution_clock::now();
@@ -164,10 +170,11 @@ int main()
             if(sec_clock.getElapsedTime().asSeconds() > 3.f) {
                 sec_clock.restart();
                 std::cout << "[FPS]: " << fps_sum/fps_count << "\n";
-                epi::timer::clearTimers();
                 fps_sum = 0;
                 fps_count = 0;
-                std::cout << "[player]:  pos: " << player_swarm.back().pos.x << "\t" << player_swarm.back().pos.y;
+                std::cout << "cell up %: " << epi::timer::Get("cell").um() / epi::timer::Get("update").um() << "\n";
+                std::cout << "cell up: um " << epi::timer::Get("cell").um() << "\n";
+                epi::timer::clearTimers();
             }
         }
         window.display();

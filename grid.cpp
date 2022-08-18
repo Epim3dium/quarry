@@ -35,6 +35,7 @@ void Grid::set(int x, int y, const CellVar& cv) {
         m_plane[m_idx(x, y)] = cv;
     }
 void Grid::m_updateSegment(vec2i min, vec2i max) {
+    epi::timer::scope timer("update");
     //high cap has to be 1 less so that max will not be equal min
     min.x = std::clamp<int>(min.x, 0, m_width - 1);
     min.y = std::clamp<int>(min.y, 0, m_height - 1);
@@ -85,6 +86,7 @@ void Grid::redrawChangedSegments(window_t& rw, AABBi view_window) {
 }
 
 void Grid::updateCell(int x, int y) {
+    epi::timer::scope timer("cell");
     if(get(x, y).type == eCellType::Air)
         return;
     if(get(x, y).getID() != m_tmp_plane[m_idx(x, y)].getID())
