@@ -4,6 +4,9 @@
 #include <SFML/Graphics.hpp>
 
 #include "RNG.h"
+#include "remap.h"
+
+extern RNG g_rng;
 
 typedef sf::Vector2f vec2f;
 typedef sf::Vector2i vec2i;
@@ -11,6 +14,7 @@ typedef sf::Vector2u vec2u;
 typedef sf::Vector2<bool> vec2b;
 typedef sf::Color clr_t;
 typedef sf::RenderWindow window_t;
+
 
 struct AABBi {
     vec2i min;

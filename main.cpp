@@ -16,7 +16,7 @@
 #define DEFAULT_BRUSH_SIZE (sqrt(GWW * GWH) / 32 / 2)
 
 
-const bool show_updated_segments = true;
+const bool show_updated_segments = false;
 const float updated_segments_opacity = 127;
 const bool print_fps = true;
 
@@ -49,6 +49,15 @@ int main()
                         grid.set(ture_coords + vec2i(x, y), CellVar(type));
         }
     };
+    const auto& SpawnIfEmptyCell = [&](sf::Keyboard::Key k, CellVar cell) {
+        if(sf::Keyboard::isKeyPressed(k)){
+            auto ture_coords = grid.convert_coords(sf::Mouse::getPosition(window), window); 
+            for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
+                for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
+                    if(grid.inBounds(ture_coords + vec2i(x, y)) && grid.get(ture_coords + vec2i(x, y)).type == eCellType::Air)
+                        grid.set(ture_coords + vec2i(x, y), cell);
+        }
+    };
     //for calculating fps
     sf::Clock sec_clock;
     std::chrono::high_resolution_clock::time_point start;
@@ -61,12 +70,6 @@ int main()
     grid.draw(window);
 
     std::flush(std::cout);
-    auto ture_coords = vec2i(50, 50); 
-            for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
-                for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
-                    if(grid.inBounds(ture_coords + vec2i(x, y)) && grid.get(ture_coords + vec2i(x, y)).type == eCellType::Air)
-                        grid.set(ture_coords + vec2i(x, y), CellVar(eCellType::Water));
-
     while (window.isOpen()) {
         sf::Event event;
         start = std::chrono::high_resolution_clock::now();
@@ -112,10 +115,14 @@ int main()
         SpawnIfEmpty(sf::Keyboard::O, eCellType::Wood);
         SpawnIfEmpty(sf::Keyboard::D, eCellType::Dirt);
         SpawnIfEmpty(sf::Keyboard::S, eCellType::Sand);
-        SpawnIfEmpty(sf::Keyboard::W, eCellType::Water);
+        SpawnIfEmpty(sf::Keyboard::W, eCellType::Wood);
         SpawnIfEmpty(sf::Keyboard::L, eCellType::Lava);
         SpawnIfEmpty(sf::Keyboard::X, eCellType::Stone);
         SpawnIfEmpty(sf::Keyboard::C, eCellType::Crystal);
+
+        CellVar fire(eCellType::Fire);
+        fire.var.Gas.Fire.isSource = true;
+        SpawnIfEmptyCell(sf::Keyboard::F, eCellType::Fire);
 
         player_input = {0, 0};
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
@@ -172,6 +179,7 @@ int main()
                 std::cout << "[FPS]: " << fps_sum/fps_count << "\n";
                 fps_sum = 0;
                 fps_count = 0;
+
                 std::cout << "cell up %: " << epi::timer::Get("cell").um() / epi::timer::Get("update").um() << "\n";
                 std::cout << "cell up: um " << epi::timer::Get("cell").um() << "\n";
                 epi::timer::clearTimers();

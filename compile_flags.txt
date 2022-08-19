@@ -4,7 +4,9 @@
 -fdiagnostics-color=always
 -L/opt/homebrew/Cellar/sfml/2.5.1_1/lib
 -I/opt/homebrew/Cellar/sfml/2.5.1_1/include
--Iinclude
+-Iinclude/.
+-Ivendor/.
+-Ivendor/lodepng/.
 -lsfml-graphics
 -lsfml-window
 -lsfml-system

@@ -1,6 +1,8 @@
 #include "utils.h"
 #include "entity_player.h"
 
+RNG g_rng;
+
 float angle(vec2f a, vec2f b) {
     vec2f d = b - a;
     return std::atan2(d.y, d.x);

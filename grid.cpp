@@ -199,7 +199,7 @@ bool Grid::check_reactions(vec2i v0, vec2i v1) {
     eCellType t1(get(v1).type);
     auto& t1_properties = CellVar::properties.at(t1);
 
-    float reaction_chance = CellVar::rng.Random();
+    float reaction_chance = g_rng.Random();
     //if t0 has a reaction with t1
     if(t0_properties.reactions.contains(t1)) {
         auto& reaction_info = t0_properties.reactions.at(t1);

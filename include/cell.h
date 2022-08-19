@@ -23,10 +23,12 @@ enum class eCellType : unsigned char {
     //solids
     Stone,
     //special
-    Grass,
-    Seed,
-    Wood,
-    Leaf,
+    //tree & vegetation
+        Grass,
+        Seed,
+        Wood,
+        Leaf,
+    Fire,
 
     Bedrock,
 };
@@ -67,11 +69,11 @@ private:
     }
     unsigned int id;
     unsigned int last_tick_updated;
+
     unsigned long getID() const {return id;}
 public:
     //if not working means you havent called InitializeProperties()
     static std::map<eCellType, CellConstants> properties;
-    static RNG rng;
 
     eCellType type;
     clr_t color;
@@ -79,9 +81,20 @@ public:
     unsigned short age;
 
     union VarUnion {
+        //everything that uses water update behaviour
         struct {
             unsigned short move_count;
-        } Water;
+
+        } Liquid;
+        //everything that uses smoke update behaviour
+        struct {
+            unsigned short move_count;
+
+            struct {
+                bool isSource;
+            }Fire;
+        } Gas;
+        //everything that uses sand update behaviour
         struct {
             unsigned char branch_count;
             char down_timer_len;
@@ -94,6 +107,7 @@ public:
         }Wood;
         struct {
             unsigned char grass_timer;
+            bool bgrew_grass;
         }Dirt;
         struct {
             unsigned char down_timer_len;
@@ -112,10 +126,10 @@ public:
     CellVar(eCellType type_) 
         : type(type_), id(m_getNextID()), age(0), last_tick_updated(0)
     {
-        auto& all_colors = properties[type].colors;
-        color = all_colors[ rng.Random<size_t>(0U, all_colors.size()) ];
         std::memset(&var, 0, sizeof(VarUnion));
-    }
 
+        auto& all_colors = properties[type].colors;
+        color = all_colors[ g_rng.Random<size_t>(0U, all_colors.size()) ];
+    }
     friend Grid;
 };
