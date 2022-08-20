@@ -2,6 +2,9 @@
 
 #include <SFML/Graphics.hpp>
 
+#include "imgui.h"
+#include "imgui-SFML.h"
+
 #include "utils.h"
 #include "grid.h"
 #include "timer.h"
@@ -35,10 +38,15 @@ int main()
     //player.pos = vec2f((float)GWW / 2, 10);
     
     int brush_size = DEFAULT_BRUSH_SIZE;
-    //body.child = std::make_unique<stem_seg_t>(stem_seg_t({200.f, 200.f}, 0.f, 100.f, &body));
 
     sf::RenderWindow window(sf::VideoMode(WW, WH), "SFML works!");
     window.setFramerateLimit(60);
+    ImGui::SFML::Init(window);
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Clear();
+    ImFont* font = io.Fonts->AddFontFromFileTTF("assets/Consolas.ttf", 32.f);
+    ImGui::SFML::UpdateFontTexture();
 
     const auto& SpawnIfEmpty = [&](sf::Keyboard::Key k, eCellType type) {
         if(sf::Keyboard::isKeyPressed(k)){
@@ -47,15 +55,6 @@ int main()
                 for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
                     if(grid.inBounds(ture_coords + vec2i(x, y)) && grid.get(ture_coords + vec2i(x, y)).type == eCellType::Air)
                         grid.set(ture_coords + vec2i(x, y), CellVar(type));
-        }
-    };
-    const auto& SpawnIfEmptyCell = [&](sf::Keyboard::Key k, CellVar cell) {
-        if(sf::Keyboard::isKeyPressed(k)){
-            auto ture_coords = grid.convert_coords(sf::Mouse::getPosition(window), window); 
-            for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
-                for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
-                    if(grid.inBounds(ture_coords + vec2i(x, y)) && grid.get(ture_coords + vec2i(x, y)).type == eCellType::Air)
-                        grid.set(ture_coords + vec2i(x, y), cell);
         }
     };
     //for calculating fps
@@ -70,11 +69,14 @@ int main()
     grid.draw(window);
 
     std::flush(std::cout);
+    //for imgui
+    sf::Clock ImGuiClock;
     while (window.isOpen()) {
         sf::Event event;
         start = std::chrono::high_resolution_clock::now();
         while (window.pollEvent(event))
         {
+            ImGui::SFML::ProcessEvent(event);
             if (event.type == sf::Event::Closed)
                 window.close();
             if(event.key.code == sf::Keyboard::Escape) {
@@ -102,6 +104,7 @@ int main()
                 }
             }
         }
+        ImGui::SFML::Update(window, ImGuiClock.restart());
         //game loop
 
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::BackSpace)){
@@ -119,10 +122,7 @@ int main()
         SpawnIfEmpty(sf::Keyboard::L, eCellType::Lava);
         SpawnIfEmpty(sf::Keyboard::X, eCellType::Stone);
         SpawnIfEmpty(sf::Keyboard::C, eCellType::Crystal);
-
-        CellVar fire(eCellType::Fire);
-        fire.var.Gas.Fire.isSource = true;
-        SpawnIfEmptyCell(sf::Keyboard::F, eCellType::Fire);
+        SpawnIfEmpty(sf::Keyboard::F, eCellType::Fire);
 
         player_input = {0, 0};
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
@@ -169,6 +169,13 @@ int main()
             }
         }
 
+        //imgui window
+        {
+            ImGui::Begin("Demo window");
+            ImGui::Button("Hello!");
+            ImGui::End();
+        }
+
         if(print_fps){
             auto end = std::chrono::high_resolution_clock::now();
             float fps = (float)1e9/(float)std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
@@ -185,6 +192,7 @@ int main()
                 epi::timer::clearTimers();
             }
         }
+        ImGui::SFML::Render(window);
         window.display();
     }
 

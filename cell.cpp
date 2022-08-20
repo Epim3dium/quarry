@@ -4,7 +4,31 @@
 
 std::map<eCellType, CellConstants> CellVar::properties = {};
 
+
+//returns true if fire has spread
+static bool checkSpreadFire(Grid& grid, const int& x, const int& y, const int& otherx, const int& othery) {
+    float flammability = grid.get(otherx, othery).getProperty().flammability;
+    if(flammability > 0.f) {
+        float dice_roll = g_rng.Random();
+        //if rolled for fire spread
+        if(dice_roll < flammability) {
+            CellVar t(eCellType::Fire);
+            t.var.Gas.Fire.isSource = true;
+            grid.set(otherx, othery, t);
+            return true;
+        //if almost got spread then just chill on the surface
+        } else if(dice_roll < flammability * 1.5f) {
+            CellVar t(eCellType::Fire);
+            t.var.Gas.Fire.isSource = true;
+            grid.set({x, y}, t);
+            return true;
+        }
+    }
+    return false;
+};
+
 void InitializeProperties() {
+    //Empty space
     CellVar::properties[eCellType::Air] = CellConstants(
         //powdery
         eState::Gas,
@@ -29,13 +53,15 @@ void InitializeProperties() {
         0.f,
         //behaviour
         [&](vec2i v, Grid& grid) {
-            const auto is_swappable = [&](const int& otherx, const int& othery) {
-                auto& my_prop = CellVar::properties[grid.get(v).type]; 
+            const auto& me = grid.get(v);
+            //return true if other cell is gas and its density is lower than mine
+            const auto isSwappable = [&](const int& otherx, const int& othery) {
                 auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
-                return other_prop.state == eState::Gas && other_prop.density > my_prop.density;
+                return other_prop.state == eState::Gas && other_prop.density > CellVar::properties[grid.get(v).type].density;
             };
-            const auto swap_and_advance_move_counter = [&](const vec2i& me, const vec2i& other) {
-                if(is_swappable(other.x, other.y)) {
+            //swaps with swappable cells and advances move counter used to deactivate cells that update too much causing fps drops
+            const auto trySwappingAndAdvanceCounter = [&](const vec2i& me, const vec2i& other) {
+                if(isSwappable(other.x, other.y)) {
                     auto t = grid.get(me);
                     t.var.Gas.move_count++;
                     grid.set(me, t);
@@ -44,23 +70,25 @@ void InitializeProperties() {
                 }
                 return false;
             };
-            if(grid.get(v).var.Gas.move_count >= MAX_SMOKE_UPDATES) {
+            //anihilate if this cell has been active for too long
+            if(me.var.Gas.move_count >= MAX_SMOKE_UPDATES) {
                 grid.set(v, eCellType::Air);
             }
-            if(swap_and_advance_move_counter(v, {v.x, v.y + 1}))
+            if(trySwappingAndAdvanceCounter(v, {v.x, v.y + 1}))
                 return;
             {
+                //let randomness decide which side goes first to make system more chaotic
                 int first_side_down = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(swap_and_advance_move_counter(v, {v.x + first_side_down, v.y + 1}))
+                if(trySwappingAndAdvanceCounter(v, {v.x + first_side_down, v.y + 1}))
                     return;
-                if(swap_and_advance_move_counter(v, {v.x - first_side_down, v.y + 1}))
+                if(trySwappingAndAdvanceCounter(v, {v.x - first_side_down, v.y + 1}))
                     return;
             }
             {
                 int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(swap_and_advance_move_counter(v, {v.x + first_side, v.y}))
+                if(trySwappingAndAdvanceCounter(v, {v.x + first_side, v.y}))
                     return;
-                if(swap_and_advance_move_counter(v, {v.x - first_side, v.y}))
+                if(trySwappingAndAdvanceCounter(v, {v.x - first_side, v.y}))
                     return;
             }
         },
@@ -99,19 +127,19 @@ void InitializeProperties() {
         0.f,
         //behaviour
         [](vec2i v, Grid& grid) {
-            const auto is_swappable = [&](const int& otherx, const int& othery) {
-                auto& my_prop = CellVar::properties[grid.get(v).type]; 
+            const auto isSwappable = [&](const int& otherx, const int& othery) {
                 auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
-                return (other_prop.state == eState::Liquid || other_prop.state == eState::Gas) || (other_prop.state == eState::Powder  && other_prop.density < my_prop.density);
+                return other_prop.state == eState::Liquid || other_prop.state == eState::Gas || 
+                    (other_prop.state == eState::Powder  && other_prop.density < CellVar::properties[grid.get(v).type].density);
             };
-            if(is_swappable(v.x, v.y - 1)) {
+            if(isSwappable(v.x, v.y - 1)) {
                 grid.swap_at(v, {v.x, v.y -1});
                 return;
             }
             int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
-            if(is_swappable(v.x + first_side, v.y - 1))
+            if(isSwappable(v.x + first_side, v.y - 1))
                 grid.swap_at(v, {v.x + first_side, v.y - 1});
-            else if(is_swappable(v.x - first_side, v.y - 1))
+            else if(isSwappable(v.x - first_side, v.y - 1))
                 grid.swap_at(v, {v.x - first_side, v.y - 1});
             return;
         },
@@ -141,7 +169,7 @@ void InitializeProperties() {
         0.f,
         //behaviour
         [](vec2i v, Grid& grid) {
-            //if dirt didnt grow grass already
+            //if dirt didnt grow grass already try to grow grass if is old enough
             if(!grid.get(v).var.Dirt.bgrew_grass) {
                 //check if it is old enough
                 if(grid.get(v).var.Dirt.grass_timer >= DIRT_TO_GRASS_REQ_TIME) {
@@ -150,19 +178,19 @@ void InitializeProperties() {
                         CellVar t(eCellType::Grass);
                         t.var.Grass.down_timer_len = g_rng.Random() > 0.5f ? 1 : 3;
                         grid.set({v.x, v.y + 1}, t);
-
                     }
-                    //not to grow grass endlessly
+                    //not to grow grass endlessly block further growth
                     auto me = grid.get(v);
                     me.var.Dirt.bgrew_grass = true;
                     grid.set(v, me);
                 } else {
+                    //age the dirt
                     auto me = grid.get(v);
                     me.var.Dirt.grass_timer += 1;
                     grid.set(v, me);
                 }
             }
-            CellVar::properties[eCellType::Cobblestone].update_behaviour(v, grid);
+            CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
         },
         //colors
         {clr_t(120, 90, 15), clr_t(100, 80, 10) },
@@ -177,26 +205,30 @@ void InitializeProperties() {
         0.f,
         //behaviour
         [](vec2i v, Grid& grid) {
-            auto t = grid.get(v);
-            auto& side = t.var.Crystal.CurSide;
+            auto me = grid.get(v);
+            auto& side = me.var.Crystal.CurSide;
+            //if side hasnt been chosen yet choose it at random
             if(abs(side) != 1) {
-                t.var.Crystal.CurSide = g_rng.Random() > 0.5f ? 1 : -1;
-                grid.set(v, t);
+                me.var.Crystal.CurSide = g_rng.Random() > 0.5f ? 1 : -1;
+                grid.set(v, me);
             }
+            //assign parent if crystal is under me
             if( grid.get(v.x + side, v.y - 1).type == eCellType::Crystal) 
             {
                 auto& parent = grid.get(v.x + side, v.y - 1);
-                if(parent.color != t.color) {
-                    t.color = parent.color;
-                    grid.set(v, t);
+                //assign right color
+                if(parent.color != me.color) {
+                    me.color = parent.color;
+                    grid.set(v, me);
                 }
-                //to not allow alterations[flickering]
+                //to not allow alterations [flickering]
                 if( grid.get(v.x - side, v.y - 1).type == eCellType::Crystal)
                     return;
+                //assign right side
                 if(parent.var.Crystal.CurSide != side) {
                     side = parent.var.Crystal.CurSide;
-                    t.color = parent.color;
-                    grid.set(v, t);
+                    me.color = parent.color;
+                    grid.set(v, me);
                 }
             }else {
                 CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
@@ -230,13 +262,14 @@ void InitializeProperties() {
         0.f,
         //behaviour
         [](vec2i v, Grid& grid) {
-            const auto is_swappable = [&](const int& otherx, const int& othery) {
+            const auto isSwappable = [&](const int& otherx, const int& othery) {
                 auto& my_prop = CellVar::properties[grid.get(v).type]; 
                 auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
                 return (other_prop.state == eState::Liquid || other_prop.state == eState::Gas) && other_prop.density < my_prop.density;
             };
-            const auto swap_and_advance_move_counter = [&](const vec2i& me, const vec2i& other) {
-                if(is_swappable(other.x, other.y)) {
+            //check if can be swapped and advance move counter used to limit number of updates caused by each liquid cell
+            const auto trySwappingAndAdvanceCounter = [&](const vec2i& me, const vec2i& other) {
+                if(isSwappable(other.x, other.y)) {
                     auto t = grid.get(me);
                     t.var.Liquid.move_count++;
                     grid.set(me, t);
@@ -249,20 +282,20 @@ void InitializeProperties() {
                 grid.set(v, eCellType::Air);
                 return;
             }
-            if(swap_and_advance_move_counter(v, {v.x, v.y - 1}))
+            if(trySwappingAndAdvanceCounter(v, {v.x, v.y - 1}))
                 return;
             {
                 int first_side_down = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(swap_and_advance_move_counter(v, {v.x + first_side_down, v.y - 1}))
+                if(trySwappingAndAdvanceCounter(v, {v.x + first_side_down, v.y - 1}))
                     return;
-                if(swap_and_advance_move_counter(v, {v.x - first_side_down, v.y - 1}))
+                if(trySwappingAndAdvanceCounter(v, {v.x - first_side_down, v.y - 1}))
                     return;
             }
             {
                 int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(swap_and_advance_move_counter(v, {v.x + first_side, v.y})) 
+                if(trySwappingAndAdvanceCounter(v, {v.x + first_side, v.y})) 
                     return;
-                if(swap_and_advance_move_counter(v, {v.x - first_side, v.y})) 
+                if(trySwappingAndAdvanceCounter(v, {v.x - first_side, v.y})) 
                     return;
             }
         },
@@ -280,7 +313,19 @@ void InitializeProperties() {
         //flammability
         0.f,
         //behaviour
-        CellVar::properties[eCellType::Water].update_behaviour,
+        [](vec2i v, Grid& grid) {
+            do {
+                if(checkSpreadFire(grid, v.x, v.y + 1, v.x, v.y + 1))
+                    break;
+                if(checkSpreadFire(grid, v.x, v.y - 1, v.x, v.y - 1))
+                    break;
+                if(checkSpreadFire(grid, v.x + 1, v.y, v.x + 1, v.y))
+                    break;
+                if(checkSpreadFire(grid, v.x - 1, v.y, v.x - 1, v.y))
+                    break;
+                CellVar::properties[eCellType::Water].update_behaviour(v, grid);
+            }while(false);
+        },
         {clr_t(220, 90, 30)},
         //reaction with water -> change to stone
         { {eCellType::Water, eCellType::Cobblestone} });
@@ -296,6 +341,7 @@ void InitializeProperties() {
         //behaviour
         CellVar::properties[eCellType::Water].update_behaviour,
         {clr_t(150, 250, 40)}
+        //reactions for acid are included at the end of all types
     );
 
     CellVar::properties[eCellType::Grass] = CellConstants(
@@ -308,11 +354,11 @@ void InitializeProperties() {
         //behaviour
         [](vec2i v, Grid& grid) {
             if(grid.get(v).var.Grass.down_timer_len > 0) {
-                auto t = grid.get(v);
-                t.var.Grass.down_timer_len -= 1;
-                grid.set(v, t);
+                auto me = grid.get(v);
+                me.var.Grass.down_timer_len -= 1;
+                grid.set(v, me);
                 if(grid.get(v.x, v.y + 1).getProperty().state == eState::Gas)
-                    grid.set(v.x, v.y + 1, t);
+                    grid.set(v.x, v.y + 1, me);
             }
             if(grid.get(v.x, v.y - 1).getProperty().state == eState::Gas || grid.get(v.x, v.y - 1).getProperty().state == eState::Liquid) {
                 grid.swap_at(v, {v.x, v.y - 1});
@@ -322,6 +368,9 @@ void InitializeProperties() {
         },
         {clr_t(30, 120, 30)}
     );
+#define TREE_MIN_INITIAL_SIZE 15
+#define TREE_MAX_INTTIAL_SIZE 25
+
 #define TREE_MIN_BRANCH_SIZE 5
 #define TREE_MAX_BRANCH_SIZE 10
 #define TREE_BRANCH_GROW_CHANCE 0.5f
@@ -341,7 +390,7 @@ void InitializeProperties() {
                 t.var.Wood.Dir.y = 1;
                 t.var.Wood.Dir.x = 0;
                 t.var.Wood.branch_count = 0;
-                t.var.Wood.down_timer_len = g_rng.Random<unsigned char>(TREE_MIN_BRANCH_SIZE, TREE_MAX_BRANCH_SIZE) + TREE_MAX_BRANCH_SIZE;
+                t.var.Wood.down_timer_len = g_rng.Random<unsigned char>(TREE_MIN_INITIAL_SIZE, TREE_MAX_INTTIAL_SIZE);
                 grid.set(v.x, v.y, t);
             }
             else {
@@ -454,7 +503,7 @@ void InitializeProperties() {
 #define MAX_FIRE_LIFETIME 30 
 #define MIN_FIRE_LIFETIME 10 
     
-#define SMOKE_CHANCE 0.1f
+#define SMOKE_CHANCE 0.05f
 
 #define FIRE_COLOR_BLEND_AREA_HEIGHT 5
     CellVar::properties[eCellType::Fire] = CellConstants(
@@ -467,36 +516,17 @@ void InitializeProperties() {
         [](vec2i v, Grid& grid) {
             auto me = grid.get(v);
             static const std::vector<clr_t> mid_colors = { clr_t(226, 88, 34), clr_t(128, 9, 9) };
-            const auto check_and_spread = [&](const int& otherx, const int& othery) {
-                float flammability = grid.get(otherx, othery).getProperty().flammability;
-                if(flammability != 0.f) {
-                    float dice_roll = g_rng.Random();
-                    //if rolled for fire spread
-                    if(dice_roll < flammability) {
-                        CellVar t(eCellType::Fire);
-                        t.var.Gas.Fire.isSource = true;
-                        grid.set(otherx, othery, t);
-                        return true;
-                    //if almost got spread then just chill on the surface
-                    } else if(dice_roll < flammability * 2) {
-                        CellVar t(eCellType::Fire);
-                        t.var.Gas.Fire.isSource = true;
-                        grid.set(v, t);
-                        return true;
-                    }
-                }
-                return false;
-            };
+
             //spreading fire 
             {
                 do {
-                    if(check_and_spread(v.x, v.y + 1))
+                    if(checkSpreadFire(grid, v.x, v.y, v.x, v.y + 1))
                         break;
-                    if(check_and_spread(v.x, v.y - 1))
+                    if(checkSpreadFire(grid, v.x, v.y, v.x, v.y - 1))
                         break;
-                    if(check_and_spread(v.x + 1, v.y))
+                    if(checkSpreadFire(grid, v.x, v.y, v.x + 1, v.y))
                         break;
-                    if(check_and_spread(v.x - 1, v.y))
+                    if(checkSpreadFire(grid, v.x, v.y, v.x - 1, v.y))
                         break;
                 } while(false);
             }
