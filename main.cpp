@@ -38,30 +38,43 @@ int main()
     //player.pos = vec2f((float)GWW / 2, 10);
     
     int brush_size = DEFAULT_BRUSH_SIZE;
+    eCellType brush_material = eCellType::Sand;
 
     sf::RenderWindow window(sf::VideoMode(WW, WH), "SFML works!");
     window.setFramerateLimit(60);
+
+    ImGuiWindowFlags imgui_flags = 0;
+    imgui_flags |= ImGuiWindowFlags_NoMove;
+    imgui_flags |= ImGuiWindowFlags_NoResize;
+    imgui_flags |= ImGuiWindowFlags_NoCollapse;
+
     ImGui::SFML::Init(window);
 
+    //setting font to something more readable and bigger
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
-    ImFont* font = io.Fonts->AddFontFromFileTTF("assets/Consolas.ttf", 32.f);
+    ImFont* font = io.Fonts->AddFontFromFileTTF("assets/Consolas.ttf", 24.f);
     ImGui::SFML::UpdateFontTexture();
 
-    const auto& SpawnIfEmpty = [&](sf::Keyboard::Key k, eCellType type) {
+    const auto& spawnAtBrush = [&]() {
+        auto grid_mouse_coords = grid.convert_coords(sf::Mouse::getPosition(window), window); 
+        for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
+            for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
+                if(grid.inBounds(grid_mouse_coords + vec2i(x, y)) && grid.get(grid_mouse_coords + vec2i(x, y)).type == eCellType::Air)
+                    grid.set(grid_mouse_coords + vec2i(x, y), CellVar(brush_material));
+    };
+    const auto& spawnMaterial = [&](sf::Keyboard::Key k, eCellType type) {
+        brush_material = type;
         if(sf::Keyboard::isKeyPressed(k)){
-            auto ture_coords = grid.convert_coords(sf::Mouse::getPosition(window), window); 
-            for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
-                for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
-                    if(grid.inBounds(ture_coords + vec2i(x, y)) && grid.get(ture_coords + vec2i(x, y)).type == eCellType::Air)
-                        grid.set(ture_coords + vec2i(x, y), CellVar(type));
+            spawnAtBrush();
         }
     };
     //for calculating fps
-    sf::Clock sec_clock;
     std::chrono::high_resolution_clock::time_point start;
-    float fps_sum = 0;
-    size_t fps_count = 0;
+    std::vector<float> fps_array;
+    float avg_fps = 60.f;
+    sf::Clock sec_clock;
+    float last_avg = 60.f;
 
     //needed to avoid flickering caused by sfml's double buffering
     grid.draw(window);
@@ -76,7 +89,6 @@ int main()
         start = std::chrono::high_resolution_clock::now();
         while (window.pollEvent(event))
         {
-            ImGui::SFML::ProcessEvent(event);
             if (event.type == sf::Event::Closed)
                 window.close();
             if(event.key.code == sf::Keyboard::Escape) {
@@ -86,7 +98,7 @@ int main()
                 if(event.key.code == sf::Keyboard::Q) {
                     auto t = brush_size;
                     brush_size = 1;
-                    SpawnIfEmpty(sf::Keyboard::Q, eCellType::Seed);
+                    spawnMaterial(sf::Keyboard::Q, eCellType::Seed);
                     brush_size = t;
                 }
 
@@ -103,26 +115,24 @@ int main()
                     brush_size = DEFAULT_BRUSH_SIZE;
                 }
             }
+            ImGui::SFML::ProcessEvent(event);
         }
         ImGui::SFML::Update(window, ImGuiClock.restart());
         //game loop
 
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::BackSpace)){
-            auto ture_coords = grid.convert_coords(sf::Mouse::getPosition(window), window); 
-            for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
-                for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
-                    if(grid.inBounds(ture_coords + vec2i(x, y)) && grid.get(ture_coords + vec2i(x, y)).type != eCellType::Bedrock)
-                        grid.set(ture_coords + vec2i(x, y), CellVar(eCellType::Air));
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
+            spawnAtBrush();
         }
-        SpawnIfEmpty(sf::Keyboard::A, eCellType::Acid);
-        SpawnIfEmpty(sf::Keyboard::O, eCellType::Wood);
-        SpawnIfEmpty(sf::Keyboard::D, eCellType::Dirt);
-        SpawnIfEmpty(sf::Keyboard::S, eCellType::Sand);
-        SpawnIfEmpty(sf::Keyboard::W, eCellType::Wood);
-        SpawnIfEmpty(sf::Keyboard::L, eCellType::Lava);
-        SpawnIfEmpty(sf::Keyboard::X, eCellType::Stone);
-        SpawnIfEmpty(sf::Keyboard::C, eCellType::Crystal);
-        SpawnIfEmpty(sf::Keyboard::F, eCellType::Fire);
+        spawnMaterial(sf::Keyboard::A, eCellType::Acid);
+        spawnMaterial(sf::Keyboard::O, eCellType::Wood);
+        spawnMaterial(sf::Keyboard::D, eCellType::Dirt);
+        spawnMaterial(sf::Keyboard::S, eCellType::Sand);
+        spawnMaterial(sf::Keyboard::W, eCellType::Water);
+        spawnMaterial(sf::Keyboard::L, eCellType::Lava);
+        spawnMaterial(sf::Keyboard::X, eCellType::Stone);
+        spawnMaterial(sf::Keyboard::C, eCellType::Crystal);
+        spawnMaterial(sf::Keyboard::F, eCellType::Fire);
+
 
         player_input = {0, 0};
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
@@ -171,25 +181,44 @@ int main()
 
         //imgui window
         {
-            ImGui::Begin("Demo window");
-            ImGui::Button("Hello!");
+            ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(WW / 5, WH), ImGuiCond_FirstUseEver);
+
+            ImGui::Begin("Demo window", nullptr, imgui_flags);
+
+            //printing fps
+            if(print_fps)
+                ImGui::Text("%f", avg_fps);
+            //brush size
+            ImGui::SliderInt("size of brush", &brush_size, 1, 32);
+            //material selection
+            {
+                std::vector<eCellType> all_materials;
+                for(auto i = eCellType::Air; i < eCellType::Bedrock; i = (eCellType)((int)i + 1))
+                    all_materials.push_back(i);
+                std::vector<const char*> all_materials_str;
+                for(auto i : all_materials)
+                    all_materials_str.push_back(to_str(i));
+
+                static int item_current = 0;
+                ImGui::ListBox("materials", &item_current, &all_materials_str[0], all_materials_str.size(), 16);
+                brush_material = all_materials[item_current];
+            }
             ImGui::End();
         }
-
         if(print_fps){
             auto end = std::chrono::high_resolution_clock::now();
             float fps = (float)1e9/(float)std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
-            fps_sum += fps;
-            fps_count++;
-            if(sec_clock.getElapsedTime().asSeconds() > 3.f) {
-                sec_clock.restart();
-                std::cout << "[FPS]: " << fps_sum/fps_count << "\n";
-                fps_sum = 0;
-                fps_count = 0;
+            if(fps_array.size() >= 64)
+                fps_array.erase(fps_array.begin());
+            fps_array.push_back(fps);
+            avg_fps = (float)std::accumulate(fps_array.begin(), fps_array.end(), 0) / fps_array.size();
 
-                std::cout << "cell up %: " << epi::timer::Get("cell").um() / epi::timer::Get("update").um() << "\n";
-                std::cout << "cell up: um " << epi::timer::Get("cell").um() << "\n";
-                epi::timer::clearTimers();
+            if(sec_clock.getElapsedTime().asSeconds() > 1.f) {
+                if(last_avg / avg_fps < 0.8f || avg_fps / last_avg < 0.8f)
+                    std::cout << "[FPS]: " << avg_fps << "\n";
+                sec_clock.restart();
+                last_avg = avg_fps;
             }
         }
         ImGui::SFML::Render(window);

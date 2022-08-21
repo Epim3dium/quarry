@@ -54,7 +54,6 @@ public:
     inline const CellVar& get(vec2i v) {
         return get(v.x, v.y);
     }
-#define MAX_CHANGED_SEG_DIST 64.f
     void set(int x, int y, const CellVar& cv);
     inline void set(vec2i v, const CellVar& cv) {
         return set(v.x, v.y, cv);

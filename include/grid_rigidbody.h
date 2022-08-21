@@ -28,9 +28,9 @@ public:
             return grid.get(x, y).getProperty().state == eState::Powder || grid.get(x, y).getProperty().state == eState::Soild;
         };
         int check_count = 0;
-#define MAX_NB_OF_CHECKS 16
+        const static int max_nb_of_checks = 16;
         bool noIntersect = false;
-        while(!noIntersect && check_count < MAX_NB_OF_CHECKS) {
+        while(!noIntersect && check_count < max_nb_of_checks) {
             check_count++;
             //bottom
             for(float x = pos.x - size.x/2 + 1; x < pos.x + size.x / 2; x++) {

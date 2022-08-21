@@ -2,6 +2,7 @@
 #include "timer.h"
 #include "grid_sprite.h"
 
+#define MAX_CHANGED_SEG_DIST 64.f
 void Grid::set(int x, int y, const CellVar& cv) {
         AABBi* cur_sector = nullptr;
         for(auto& seg : m_ChangedSectors) {
@@ -43,7 +44,7 @@ void Grid::m_updateSegment(vec2i min, vec2i max) {
     max.x = std::clamp<int>(max.x, min.x + 1, m_width);
     max.y = std::clamp<int>(max.y, min.y + 1, m_height);
 
-    bool left_to_right = tick_passed_total % 4;
+    bool left_to_right = tick_passed_total % 2;
 
     m_tmp_plane = m_plane;
     if(left_to_right)

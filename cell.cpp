@@ -4,6 +4,46 @@
 
 std::map<eCellType, CellConstants> CellVar::properties = {};
 
+const char* to_str(eCellType type) {
+#define STRINGYFY(str) #str
+    switch(type) {
+        case(eCellType::Air):
+            return STRINGYFY(eCellType::Air);
+        case(eCellType::Smoke):
+            return STRINGYFY(eCellType::Smoke);
+        case(eCellType::Steam):
+            return STRINGYFY(eCellType::Steam);
+        case(eCellType::        Water):
+            return STRINGYFY(eCellType::Water);
+        case(eCellType::Lava):
+            return STRINGYFY(eCellType::Lava);
+        case(eCellType::Acid):
+            return STRINGYFY(eCellType::Acid);
+        case(eCellType::Sand):
+            return STRINGYFY(eCellType::Sand);
+        case(eCellType::Cobblestone):
+            return STRINGYFY(eCellType::Cobblestone);
+        case(eCellType::Dirt):
+            return STRINGYFY(eCellType::Dirt);
+        case(eCellType::Crystal):
+            return STRINGYFY(eCellType::Crystal);
+        case(eCellType::Stone):
+            return STRINGYFY(eCellType::Stone);
+        case(eCellType::Grass):
+            return STRINGYFY(eCellType::Grass);
+        case(eCellType::Seed):
+            return STRINGYFY(eCellType::Seed);
+        case(eCellType::Wood):
+            return STRINGYFY(eCellType::Wood);
+        case(eCellType::Leaf):
+            return STRINGYFY(eCellType::Leaf);
+        case(eCellType::Fire):
+            return STRINGYFY(eCellType::Fire);
+        case(eCellType::Bedrock):
+            return STRINGYFY(eCellType::Bedrock);
+    }
+    return "none";
+}
 
 //returns true if fire has spread
 static bool checkSpreadFire(Grid& grid, const int& x, const int& y, const int& otherx, const int& othery) {

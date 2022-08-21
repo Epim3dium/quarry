@@ -11,7 +11,6 @@
 -lsfml-graphics
 -lsfml-window
 -lsfml-system
--framework openGL
 -Wno-unused-command-line-argument
 -Wno-deprecated-declarations
 -Wno-unused

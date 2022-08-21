@@ -8,7 +8,7 @@ class Grid;
 
 enum class eCellType : unsigned char {
     //gases
-    Air,
+    Air = 0,
     Smoke,
     Steam,
     //liquids
@@ -32,6 +32,7 @@ enum class eCellType : unsigned char {
 
     Bedrock,
 };
+const char* to_str(eCellType type);
 enum eState {
     Gas,
     Liquid,
