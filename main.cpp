@@ -19,25 +19,19 @@
 #define DEFAULT_BRUSH_SIZE (sqrt(GWW * GWH) / 32 / 2)
 
 
-const bool show_updated_segments = false;
-const float updated_segments_opacity = 127;
-const bool print_fps = true;
+bool show_updated_segments = false;
+unsigned char updated_segments_opacity = 255;
+bool print_fps = false;
 
 int main()
 {
     InitializeProperties();
 
-    vec2i player_input = {0, 0};
-    std::vector<Player> player_swarm;
-    for(int i = 1; i < 2; i++) {
-        player_swarm.push_back(&player_input);
-        player_swarm.back().pos = vec2f{(float)GWW / 10 * i, 10};
-    }
-
     Grid grid(GWW, GWH);
     //player.pos = vec2f((float)GWW / 2, 10);
     
     int brush_size = DEFAULT_BRUSH_SIZE;
+    bool on_brush_click = false;
     eCellType brush_material = eCellType::Sand;
 
     sf::RenderWindow window(sf::VideoMode(WW, WH), "SFML works!");
@@ -49,6 +43,7 @@ int main()
     imgui_flags |= ImGuiWindowFlags_NoCollapse;
 
     ImGui::SFML::Init(window);
+    vec2f ImGuiWindowSize(WW/5, WH);
 
     //setting font to something more readable and bigger
     ImGuiIO& io = ImGui::GetIO();
@@ -56,11 +51,18 @@ int main()
     ImFont* font = io.Fonts->AddFontFromFileTTF("assets/Consolas.ttf", 24.f);
     ImGui::SFML::UpdateFontTexture();
 
-    const auto& spawnAtBrush = [&]() {
-        auto grid_mouse_coords = grid.convert_coords(sf::Mouse::getPosition(window), window); 
+    vec2i player_input = {0, 0};
+    std::vector<Player> player_swarm;
+    player_swarm.push_back(&player_input);
+    player_swarm.back().pos = vec2f{(float)GWW / 2, 10};
+    const auto& spawnAtBrush = [&](bool ifEmpty = false) {
+        vec2i mouse_pos = sf::Mouse::getPosition(window);
+        if(mouse_pos.x < ImGuiWindowSize.x && mouse_pos.y < ImGuiWindowSize.y)
+            return;
+        auto grid_mouse_coords = grid.convert_coords(mouse_pos, window); 
         for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
             for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
-                if(grid.inBounds(grid_mouse_coords + vec2i(x, y)) && grid.get(grid_mouse_coords + vec2i(x, y)).type == eCellType::Air)
+                if(grid.inBounds(grid_mouse_coords + vec2i(x, y)) && (grid.get(grid_mouse_coords + vec2i(x, y)).type == eCellType::Air || !ifEmpty))
                     grid.set(grid_mouse_coords + vec2i(x, y), CellVar(brush_material));
     };
     const auto& spawnMaterial = [&](sf::Keyboard::Key k, eCellType type) {
@@ -91,10 +93,7 @@ int main()
         {
             if (event.type == sf::Event::Closed)
                 window.close();
-            if(event.key.code == sf::Keyboard::Escape) {
-                window.close();
-            }
-            if(event.type == sf::Event::KeyPressed) {
+            else if(event.type == sf::Event::KeyPressed) {
                 if(event.key.code == sf::Keyboard::Q) {
                     auto t = brush_size;
                     brush_size = 1;
@@ -115,12 +114,16 @@ int main()
                     brush_size = DEFAULT_BRUSH_SIZE;
                 }
             }
+            else if(event.type == sf::Event::MouseButtonPressed) {
+                if(on_brush_click)
+                    spawnAtBrush();
+            }
             ImGui::SFML::ProcessEvent(event);
         }
         ImGui::SFML::Update(window, ImGuiClock.restart());
         //game loop
 
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !on_brush_click) {
             spawnAtBrush();
         }
         spawnMaterial(sf::Keyboard::A, eCellType::Acid);
@@ -187,10 +190,18 @@ int main()
             ImGui::Begin("Demo window", nullptr, imgui_flags);
 
             //printing fps
-            if(print_fps)
-                ImGui::Text("%f", avg_fps);
+            ImGui::Text("%f", avg_fps);
+            //show updated segments
+            if(ImGui::Button("show update seg's")) {
+                show_updated_segments = !show_updated_segments;
+            }
+            if(show_updated_segments) {
+                static float opacity = 1.f;
+                ImGui::SliderFloat("opacity", &opacity, 0.f, 1.f);
+                updated_segments_opacity = 255 * opacity;
+            }
             //brush size
-            ImGui::SliderInt("size of brush", &brush_size, 1, 32);
+            ImGui::SliderInt("brush", &brush_size, 1, 32);
             //material selection
             {
                 std::vector<eCellType> all_materials;
@@ -201,12 +212,18 @@ int main()
                     all_materials_str.push_back(to_str(i));
 
                 static int item_current = 0;
-                ImGui::ListBox("materials", &item_current, &all_materials_str[0], all_materials_str.size(), 16);
+                ImGui::ListBox("mat", &item_current, &all_materials_str[0], all_materials_str.size(), 16);
                 brush_material = all_materials[item_current];
+
+                on_brush_click = false;
+                if(brush_material == eCellType::Seed){
+                    on_brush_click = true;
+                    brush_size = 1;
+                }
             }
             ImGui::End();
         }
-        if(print_fps){
+        {
             auto end = std::chrono::high_resolution_clock::now();
             float fps = (float)1e9/(float)std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
             if(fps_array.size() >= 64)
@@ -214,11 +231,13 @@ int main()
             fps_array.push_back(fps);
             avg_fps = (float)std::accumulate(fps_array.begin(), fps_array.end(), 0) / fps_array.size();
 
-            if(sec_clock.getElapsedTime().asSeconds() > 1.f) {
-                if(last_avg / avg_fps < 0.8f || avg_fps / last_avg < 0.8f)
-                    std::cout << "[FPS]: " << avg_fps << "\n";
-                sec_clock.restart();
-                last_avg = avg_fps;
+            if(print_fps){
+                if(sec_clock.getElapsedTime().asSeconds() > 1.f) {
+                    if(last_avg / avg_fps < 0.8f || avg_fps / last_avg < 0.8f)
+                        std::cout << "[FPS]: " << avg_fps << "\n";
+                    sec_clock.restart();
+                    last_avg = avg_fps;
+                }
             }
         }
         ImGui::SFML::Render(window);

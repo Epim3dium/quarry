@@ -95,17 +95,6 @@ void Grid::updateCell(int x, int y) {
     if(get(x, y).last_tick_updated >= tick_passed_total) 
         return;
     auto& cur_prop = CellVar::properties[get(x, y).type];
-    if(x > 0 && y > 0 && x < m_width - 1 && y < m_height - 1)
-        do {
-            if(check_reactions({x, y}, {x + 1, y}))
-                continue;
-            if(check_reactions({x, y}, {x - 1, y}))
-                continue;
-            if(check_reactions({x, y}, {x, y + 1}))
-                continue;
-            if(check_reactions({x, y}, {x, y - 1}))
-                continue;
-        }while(false);
     //using m_idx to bypass setting and causing unnecessary checks
     m_plane[m_idx(x, y)].last_tick_updated = tick_passed_total;
     m_plane[m_idx(x, y)].age++;
@@ -192,35 +181,6 @@ void Grid::m_drawSegment(vec2i min, vec2i max, window_t& rw) {
             rw.draw(t);
         }
     }
-}
-bool Grid::check_reactions(vec2i v0, vec2i v1) {
-    bool hasReacted = false;
-    eCellType t0(get(v0).type);
-    auto& t0_properties = CellVar::properties.at(t0);
-    eCellType t1(get(v1).type);
-    auto& t1_properties = CellVar::properties.at(t1);
-
-    float reaction_chance = g_rng.Random();
-    //if t0 has a reaction with t1
-    if(t0_properties.reactions.contains(t1)) {
-        auto& reaction_info = t0_properties.reactions.at(t1);
-
-        bool reaction_sustained = reaction_chance < reaction_info.probability;
-        if(reaction_sustained) {
-            set(v0, CellVar(t0_properties.reactions.at(t1).product));
-            hasReacted = true;
-        }
-    }
-    if(t1_properties.reactions.contains(t0)) {
-        auto& reaction_info = t1_properties.reactions.at(t0);
-
-        bool reaction_sustained = reaction_chance < reaction_info.probability;
-        if(reaction_sustained) {
-            set(v1, CellVar(reaction_info.product));
-            hasReacted = true;
-        }
-    }
-    return hasReacted;
 }
 vec2i Grid::convert_coords(vec2i px_pos, window_t& window) {
     vec2f size = window.getDefaultView().getSize();

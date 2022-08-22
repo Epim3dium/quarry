@@ -24,10 +24,11 @@ enum class eCellType : unsigned char {
     Stone,
     //special
     //tree & vegetation
-        Grass,
-        Seed,
-        Wood,
-        Leaf,
+    Grass,
+    Seed,
+    Wood,
+    Leaf,
+
     Fire,
 
     Bedrock,
@@ -51,13 +52,11 @@ struct CellConstants {
     int density;
     float flammability;
     std::function<void(vec2i, Grid&)> update_behaviour;
-    std::map<eCellType, CellReaction> reactions;
     std::vector<clr_t> colors;
 
     CellConstants() {}
-    CellConstants(eState state_of_matter, int density_, float flammability_, std::function<void(vec2i, Grid&)> update_func_, std::initializer_list<clr_t> colors_, 
-            std::map<eCellType, CellReaction> reactions_ = std::map<eCellType, CellReaction>()) 
-        : state(state_of_matter), density(density_), flammability(flammability_), update_behaviour( update_func_), colors(colors_), reactions(reactions_) {}
+    CellConstants(eState state_of_matter, int density_, float flammability_, std::function<void(vec2i, Grid&)> update_func_, std::initializer_list<clr_t> colors_) 
+        : state(state_of_matter), density(density_), flammability(flammability_), update_behaviour( update_func_), colors(colors_) {}
 };
 
 void InitializeProperties();
@@ -82,19 +81,13 @@ public:
     unsigned short age;
 
     union VarUnion {
-        //everything that uses water update behaviour
         struct {
             unsigned short move_count;
-
-        } Liquid;
-        //everything that uses smoke update behaviour
-        struct {
-            unsigned short move_count;
-
             struct {
                 bool isSource;
             }Fire;
-        } Gas;
+
+        }Unstable;
         //everything that uses sand update behaviour
         struct {
             unsigned char branch_count;

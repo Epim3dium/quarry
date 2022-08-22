@@ -64,7 +64,6 @@ public:
         set(v0, get(v1));
         set(v1, t);
     }
-    bool check_reactions(vec2i v0, vec2i v1);
 
     vec2i convert_coords(vec2i px_pos, window_t& window);
     void drawCellAt(int x, int y, AABBi view_window, clr_t color, window_t& rw);

@@ -8,8 +8,7 @@ OBJ=main.o utils.o cell.o grid.o lodepng.o entity_player.o
 %.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) -framework openGL
 
-SFML_OBJ=imgui/imgui-SFML.o imgui/imgui.o imgui/imgui_demo.o imgui/imgui_draw.o imgui/imgui_tables.o imgui/imgui_widgets.o
-
+SFML_OBJ=vendor/imgui/imguilib.a
 
 main.exe: $(OBJ) $(SFML_OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) -framework openGL

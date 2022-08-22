@@ -2,65 +2,64 @@
 #include "grid.h"
 #include <random>
 
+//TODO:
+//Cobblestone + water = dirt
+//dirt + lava = Cobblestone
+//acid
+
 std::map<eCellType, CellConstants> CellVar::properties = {};
+
+#define FOR_CELLS_AROUND_ME(func)\
+func(grid, v, vec2i(v.x, v.y + 1));\
+func(grid, v, vec2i(v.x, v.y - 1));\
+func(grid, v, vec2i(v.x + 1, v.y));\
+func(grid, v, vec2i(v.x - 1, v.y));
 
 const char* to_str(eCellType type) {
 #define STRINGYFY(str) #str
+#define CASE_RETURN(t)\
+    case t:\
+        return STRINGYFY(t)
     switch(type) {
-        case(eCellType::Air):
-            return STRINGYFY(eCellType::Air);
-        case(eCellType::Smoke):
-            return STRINGYFY(eCellType::Smoke);
-        case(eCellType::Steam):
-            return STRINGYFY(eCellType::Steam);
-        case(eCellType::        Water):
-            return STRINGYFY(eCellType::Water);
-        case(eCellType::Lava):
-            return STRINGYFY(eCellType::Lava);
-        case(eCellType::Acid):
-            return STRINGYFY(eCellType::Acid);
-        case(eCellType::Sand):
-            return STRINGYFY(eCellType::Sand);
-        case(eCellType::Cobblestone):
-            return STRINGYFY(eCellType::Cobblestone);
-        case(eCellType::Dirt):
-            return STRINGYFY(eCellType::Dirt);
-        case(eCellType::Crystal):
-            return STRINGYFY(eCellType::Crystal);
-        case(eCellType::Stone):
-            return STRINGYFY(eCellType::Stone);
-        case(eCellType::Grass):
-            return STRINGYFY(eCellType::Grass);
-        case(eCellType::Seed):
-            return STRINGYFY(eCellType::Seed);
-        case(eCellType::Wood):
-            return STRINGYFY(eCellType::Wood);
-        case(eCellType::Leaf):
-            return STRINGYFY(eCellType::Leaf);
-        case(eCellType::Fire):
-            return STRINGYFY(eCellType::Fire);
-        case(eCellType::Bedrock):
-            return STRINGYFY(eCellType::Bedrock);
+        CASE_RETURN(eCellType::Air);
+        CASE_RETURN(eCellType::Smoke);
+        CASE_RETURN(eCellType::Steam);
+        CASE_RETURN(eCellType::Water);
+        CASE_RETURN(eCellType::Lava);
+        CASE_RETURN(eCellType::Acid);
+        CASE_RETURN(eCellType::Sand);
+        CASE_RETURN(eCellType::Cobblestone);
+        CASE_RETURN(eCellType::Dirt);
+        CASE_RETURN(eCellType::Crystal);
+        CASE_RETURN(eCellType::Stone);
+        CASE_RETURN(eCellType::Grass);
+        CASE_RETURN(eCellType::Seed);
+        CASE_RETURN(eCellType::Wood);
+        CASE_RETURN(eCellType::Leaf);
+        CASE_RETURN(eCellType::Fire);
+        CASE_RETURN(eCellType::Bedrock);
+        default:
+            return "not named";
     }
     return "none";
 }
 
 //returns true if fire has spread
-static bool checkSpreadFire(Grid& grid, const int& x, const int& y, const int& otherx, const int& othery) {
-    float flammability = grid.get(otherx, othery).getProperty().flammability;
+static bool checkSpreadFire(Grid& grid, const vec2i& v, const vec2i& other) {
+    float flammability = grid.get(other.x, other.y).getProperty().flammability;
     if(flammability > 0.f) {
         float dice_roll = g_rng.Random();
         //if rolled for fire spread
         if(dice_roll < flammability) {
             CellVar t(eCellType::Fire);
-            t.var.Gas.Fire.isSource = true;
-            grid.set(otherx, othery, t);
+            t.var.Unstable.Fire.isSource = true;
+            grid.set(other.x, other.y, t);
             return true;
         //if almost got spread then just chill on the surface
         } else if(dice_roll < flammability * 1.5f) {
             CellVar t(eCellType::Fire);
-            t.var.Gas.Fire.isSource = true;
-            grid.set({x, y}, t);
+            t.var.Unstable.Fire.isSource = true;
+            grid.set(v, t);
             return true;
         }
     }
@@ -103,7 +102,7 @@ void InitializeProperties() {
             const auto trySwappingAndAdvanceCounter = [&](const vec2i& me, const vec2i& other) {
                 if(isSwappable(other.x, other.y)) {
                     auto t = grid.get(me);
-                    t.var.Gas.move_count++;
+                    t.var.Unstable.move_count++;
                     grid.set(me, t);
                     grid.swap_at(me, other);
                     return true;
@@ -111,7 +110,7 @@ void InitializeProperties() {
                 return false;
             };
             //anihilate if this cell has been active for too long
-            if(me.var.Gas.move_count >= MAX_SMOKE_UPDATES) {
+            if(me.var.Unstable.move_count >= MAX_SMOKE_UPDATES) {
                 grid.set(v, eCellType::Air);
             }
             if(trySwappingAndAdvanceCounter(v, {v.x, v.y + 1}))
@@ -196,8 +195,7 @@ void InitializeProperties() {
         //behaviour
         CellVar::properties[eCellType::Sand].update_behaviour,
         //colors
-        {clr_t(150, 150, 150), clr_t(100, 100, 100) }, 
-        { {eCellType::Water,    {eCellType::Dirt, 0.01f} } }
+        {clr_t(150, 150, 150), clr_t(100, 100, 100) }
     );
 #define DIRT_TO_GRASS_REQ_TIME 120
     CellVar::properties[eCellType::Dirt] = CellConstants(
@@ -233,8 +231,7 @@ void InitializeProperties() {
             CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
         },
         //colors
-        {clr_t(120, 90, 15), clr_t(100, 80, 10) },
-        { {eCellType::Lava, { eCellType::Cobblestone, 0.01f } } }
+        {clr_t(120, 90, 15), clr_t(100, 80, 10) }
     );
     CellVar::properties[eCellType::Crystal] = CellConstants(
         //powdery
@@ -311,14 +308,14 @@ void InitializeProperties() {
             const auto trySwappingAndAdvanceCounter = [&](const vec2i& me, const vec2i& other) {
                 if(isSwappable(other.x, other.y)) {
                     auto t = grid.get(me);
-                    t.var.Liquid.move_count++;
+                    t.var.Unstable.move_count++;
                     grid.set(me, t);
                     grid.swap_at(me, other);
                     return true;
                 }
                 return false;
             };
-            if(grid.get(v).var.Liquid.move_count >= MAX_LIQUID_UPDATES){
+            if(grid.get(v).var.Unstable.move_count >= MAX_LIQUID_UPDATES){
                 grid.set(v, eCellType::Air);
                 return;
             }
@@ -340,9 +337,8 @@ void InitializeProperties() {
             }
         },
         //colors
-        {clr_t(50, 50, 150)},
+        {clr_t(50, 50, 150)}
         //reaction with lava -> change to smoke
-        { {eCellType::Lava, eCellType::Steam} }
     );
 
     CellVar::properties[eCellType::Lava] = CellConstants(
@@ -354,23 +350,24 @@ void InitializeProperties() {
         0.f,
         //behaviour
         [](vec2i v, Grid& grid) {
-            do {
-                if(checkSpreadFire(grid, v.x, v.y + 1, v.x, v.y + 1))
-                    break;
-                if(checkSpreadFire(grid, v.x, v.y - 1, v.x, v.y - 1))
-                    break;
-                if(checkSpreadFire(grid, v.x + 1, v.y, v.x + 1, v.y))
-                    break;
-                if(checkSpreadFire(grid, v.x - 1, v.y, v.x - 1, v.y))
-                    break;
-                CellVar::properties[eCellType::Water].update_behaviour(v, grid);
-            }while(false);
+            FOR_CELLS_AROUND_ME(checkSpreadFire);
+            vec2i water_where(-1, -1);
+            auto checkWaterAroundMe = [&water_where](Grid& grid, vec2i v, vec2i other) {
+                if(grid.get(other).type == eCellType::Water)
+                    water_where = other;
+            };
+            FOR_CELLS_AROUND_ME(checkWaterAroundMe);
+            if(water_where.x != -1 && water_where.y != -1) {
+                grid.set(water_where, eCellType::Steam);
+                grid.set(v, eCellType::Cobblestone);
+                return;
+            }
+            CellVar::properties[eCellType::Water].update_behaviour(v, grid);
         },
-        {clr_t(220, 90, 30)},
-        //reaction with water -> change to stone
-        { {eCellType::Water, eCellType::Cobblestone} });
-
+        {clr_t(220, 90, 30)}
+    );
 #define ACID_REACTION_PROBABILITY 0.05f
+#define ACID_SMOKE_PROBABILITY 0.1f
     CellVar::properties[eCellType::Acid] = CellConstants(
         //powdery
         eState::Liquid,
@@ -379,7 +376,30 @@ void InitializeProperties() {
         //flammability
         0.f,
         //behaviour
-        CellVar::properties[eCellType::Water].update_behaviour,
+        [](vec2i v, Grid& grid) {
+            bool hasReacted = false;
+            const auto& annihilateNeighbour = [&](Grid& g, vec2i v, vec2i other) {
+                if(grid.get(other).getProperty().state == eState::Gas || grid.get(other).type == eCellType::Acid || grid.get(other).type == eCellType::Bedrock)
+                    return;
+                if(hasReacted)
+                    return;
+                if(g_rng.Random() < ACID_REACTION_PROBABILITY) {
+                    if(g_rng.Random() < ACID_SMOKE_PROBABILITY)
+                        grid.set(v, eCellType::Smoke);
+                    else 
+                        grid.set(v, eCellType::Air);
+                    grid.set(other, eCellType::Air);
+                }
+            };
+            FOR_CELLS_AROUND_ME(annihilateNeighbour);
+            
+            if(!hasReacted) {
+                auto me = grid.get(v);
+                me.var.Unstable.move_count++;
+                grid.set(v, me);
+                CellVar::properties[eCellType::Water].update_behaviour(v, grid);
+            }
+        },
         {clr_t(150, 250, 40)}
         //reactions for acid are included at the end of all types
     );
@@ -559,19 +579,10 @@ void InitializeProperties() {
 
             //spreading fire 
             {
-                do {
-                    if(checkSpreadFire(grid, v.x, v.y, v.x, v.y + 1))
-                        break;
-                    if(checkSpreadFire(grid, v.x, v.y, v.x, v.y - 1))
-                        break;
-                    if(checkSpreadFire(grid, v.x, v.y, v.x + 1, v.y))
-                        break;
-                    if(checkSpreadFire(grid, v.x, v.y, v.x - 1, v.y))
-                        break;
-                } while(false);
+                FOR_CELLS_AROUND_ME(checkSpreadFire);
             }
             //if fire is source
-            if(me.var.Gas.Fire.isSource == true) {
+            if(me.var.Unstable.Fire.isSource == true) {
                 //if no flammable material around you
                 if(grid.get(v.x, v.y - 1).getProperty().flammability <= 0.f && grid.get(v.x, v.y + 1).getProperty().flammability <= 0.f &&
                     grid.get(v.x - 1, v.y).getProperty().flammability <= 0.f && grid.get(v.x + 1, v.y).getProperty().flammability <= 0.f)
@@ -632,20 +643,4 @@ void InitializeProperties() {
         //colors
         {clr_t(50, 50, 50)}
     );
-    //adding reaction with acid to everything
-    for(auto& p : CellVar::properties) {
-        if(p.first != eCellType::Acid && p.first != eCellType::Smoke && p.first != eCellType::Air && p.first != eCellType::Bedrock) {
-            p.second.reactions[eCellType::Acid] = { eCellType::Air, ACID_REACTION_PROBABILITY };
-            CellVar::properties[eCellType::Acid].reactions[p.first] = { eCellType::Smoke, ACID_REACTION_PROBABILITY };
-        }
-    }
-#define bSHOULD_GAS_ANNIGILATE false
-#define GAS_ANNIHILIATION_CHANCE 0.001f
-
-#if bSHOULD_GAS_ANNIGILATE
-    for(auto& p : CellVar::properties) {
-        if(p.second.state == eState::Gas)
-            p.second.reactions[eCellType::Air] = {eCellType::Air, GAS_ANNIHILIATION_CHANCE};
-    }
-#endif
 }
