@@ -13,10 +13,12 @@
 #define WW 2048.f
 #define WH 2048.f
 
-#define GWW 256 
-#define GWH 256 
+#define GWW 258
+#define GWH 258
 
 #define DEFAULT_BRUSH_SIZE (sqrt(GWW * GWH) / 32 / 2)
+
+#define VIEW_WINDOW {{0, 0}, {256, 256}}
 
 
 bool show_updated_segments = false;
@@ -59,7 +61,7 @@ int main()
         vec2i mouse_pos = sf::Mouse::getPosition(window);
         if(mouse_pos.x < ImGuiWindowSize.x && mouse_pos.y < ImGuiWindowSize.y)
             return;
-        auto grid_mouse_coords = grid.convert_coords(mouse_pos, window); 
+        auto grid_mouse_coords = grid.convert_coords(mouse_pos, VIEW_WINDOW, window); 
         for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
             for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
                 if(grid.inBounds(grid_mouse_coords + vec2i(x, y)) && (grid.get(grid_mouse_coords + vec2i(x, y)).type == eCellType::Air || !ifEmpty))
@@ -149,14 +151,14 @@ int main()
 
         {
             epi::timer::scope timer("grid");
-            grid.redrawChangedSegment(window);
+            grid.redrawChangedSegments(window, VIEW_WINDOW);
             grid.updateChangedSegments();
         }
         {
             epi::timer::scope timer("player");
             for(auto& player : player_swarm) {
                 player.update(grid);
-                player.draw(grid.getDefaultViewWindow(), grid, window);
+                player.draw(VIEW_WINDOW, grid, window);
             }
         }
 

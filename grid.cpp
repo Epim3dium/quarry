@@ -182,14 +182,18 @@ void Grid::m_drawSegment(vec2i min, vec2i max, window_t& rw) {
         }
     }
 }
-vec2i Grid::convert_coords(vec2i px_pos, window_t& window) {
+vec2i Grid::convert_coords(vec2i mouse_pos, AABBi view_window, window_t& window) {
     vec2f size = window.getDefaultView().getSize();
     vec2f seg_size;
-    seg_size.x = size.x / m_width;
-    seg_size.y = size.y / m_height;
-    int pos_x = int(px_pos.x /  seg_size.x); 
-    int pos_y = int(size.y/seg_size.y - px_pos.y / seg_size.y);
-    pos_x = std::clamp<int>(pos_x, 0, m_width - 1);
-    pos_y = std::clamp<int>(pos_y, 0, m_height - 1);
+    seg_size.x = size.x / view_window.size().x;
+    seg_size.y = size.y / view_window.size().y;
+    int pos_x = int(mouse_pos.x /  seg_size.x);
+    int pos_y = int(size.y/seg_size.y - mouse_pos.y / seg_size.y);
+
+    pos_x = std::clamp<int>(pos_x, 0, view_window.size().x - 1);
+    pos_y = std::clamp<int>(pos_y, 0, view_window.size().y- 1);
+
+    pos_x += view_window.min.x;
+    pos_y += view_window.min.y;
     return {pos_x, pos_y};
 }

@@ -65,7 +65,7 @@ public:
         set(v1, t);
     }
 
-    vec2i convert_coords(vec2i px_pos, window_t& window);
+    vec2i convert_coords(vec2i mouse_pos, AABBi view_window, window_t& window);
     void drawCellAt(int x, int y, AABBi view_window, clr_t color, window_t& rw);
     inline void drawCellAt(int x, int y, clr_t color, window_t& rw) {
         drawCellAt(x, y, { vec2i(0, 0), vec2i(m_width, m_height) }, color, rw);
@@ -75,7 +75,7 @@ public:
     void updateChangedSegments();
 
     void redrawChangedSegments(window_t& rw, AABBi view_window);
-    inline void redrawChangedSegment(window_t& rw) {
+    inline void redrawChangedSegments(window_t& rw) {
         redrawChangedSegments(rw, getDefaultViewWindow());
     }
 
