@@ -25,6 +25,25 @@ bool show_updated_segments = false;
 unsigned char updated_segments_opacity = 255;
 bool print_fps = false;
 
+#define CONSOLAS_PATH "assets/Consolas.ttf"
+
+void setupImGuiFont() {
+    sf::Font consolas;
+    if (!consolas.loadFromFile(CONSOLAS_PATH)) {
+        std::cout << "error while lodaing font file!";
+        exit(1);
+    }
+
+    //for bigger font
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Clear();
+    io.WantCaptureMouse = true;
+    io.WantCaptureMouseUnlessPopupClose = true;
+    
+    ImFont* font = io.Fonts->AddFontFromFileTTF(CONSOLAS_PATH, 24.f);
+    ImGui::SFML::UpdateFontTexture();
+}
+
 int main()
 {
     InitializeProperties();
@@ -36,7 +55,7 @@ int main()
     bool on_brush_click = false;
     eCellType brush_material = eCellType::Sand;
 
-    sf::RenderWindow window(sf::VideoMode(WW, WH), "SFML works!");
+    sf::RenderWindow window(sf::VideoMode(WW, WH), "automata");
     window.setFramerateLimit(60);
 
     ImGuiWindowFlags imgui_flags = 0;
@@ -48,10 +67,7 @@ int main()
     vec2f ImGuiWindowSize(WW/5, WH);
 
     //setting font to something more readable and bigger
-    ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->Clear();
-    ImFont* font = io.Fonts->AddFontFromFileTTF("assets/Consolas.ttf", 24.f);
-    ImGui::SFML::UpdateFontTexture();
+    setupImGuiFont();
 
     vec2i player_input = {0, 0};
     std::vector<Player> player_swarm;
