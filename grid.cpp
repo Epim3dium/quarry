@@ -60,6 +60,20 @@ void Grid::m_updateSegment(vec2i min, vec2i max) {
             }
         }
 }
+void Grid::updateCell(int x, int y) {
+    epi::timer::scope timer("cell");
+    if(get(x, y).type == eCellType::Air)
+        return;
+    if(get(x, y).getID() != m_tmp_plane[m_idx(x, y)].getID())
+        return;
+    if(get(x, y).last_tick_updated >= tick_passed_total) 
+        return;
+    auto& cur_prop = CellVar::properties[get(x, y).type];
+    //using m_idx to bypass setting and causing unnecessary checks
+    m_plane[m_idx(x, y)].last_tick_updated = tick_passed_total;
+    m_plane[m_idx(x, y)].age++;
+    cur_prop.update_behaviour({x, y}, *this);
+}
 #define CHANGED_SEGMENT_PADDING 2
 void Grid::updateChangedSegments() {
     std::vector<AABBi> tmp = m_ChangedSectors;
@@ -77,57 +91,50 @@ void Grid::updateChangedSegments() {
         }
     }
 };
-void Grid::redrawChangedSegments(window_t& rw, AABBi view_window) {
+void Grid::redrawChangedSegments() {
     for(auto& seg : m_SegmentsToRerender) {
         vec2i padding = {CHANGED_SEGMENT_PADDING, CHANGED_SEGMENT_PADDING};
         if(seg.min.x != (int)0xffffff)
-            m_redrawSegment({ seg.min - padding, seg.max + padding}, view_window, rw);
+            m_redrawSegment({ seg.min - padding, seg.max + padding});
     }
     m_SegmentsToRerender.clear();
 }
 
-void Grid::updateCell(int x, int y) {
-    epi::timer::scope timer("cell");
-    if(get(x, y).type == eCellType::Air)
-        return;
-    if(get(x, y).getID() != m_tmp_plane[m_idx(x, y)].getID())
-        return;
-    if(get(x, y).last_tick_updated >= tick_passed_total) 
-        return;
-    auto& cur_prop = CellVar::properties[get(x, y).type];
-    //using m_idx to bypass setting and causing unnecessary checks
-    m_plane[m_idx(x, y)].last_tick_updated = tick_passed_total;
-    m_plane[m_idx(x, y)].age++;
-    cur_prop.update_behaviour({x, y}, *this);
-}
 //redraw window defines what segment should be redrawn and view_window the size of full window that should fit on the screen
-void Grid::m_redrawSegment(AABBi redraw_window, AABBi view_window, window_t& rw) {
+void Grid::m_redrawSegment(AABBi redraw_window) {
+
     redraw_window.min.x = std::clamp<int>(redraw_window.min.x, 0, m_width);
     redraw_window.min.y = std::clamp<int>(redraw_window.min.y, 0, m_height);
 
     redraw_window.max.x = std::clamp<int>(redraw_window.max.x, 0, m_width);
     redraw_window.max.y = std::clamp<int>(redraw_window.max.y, 0, m_height);
     //^^clamping everything
-    vec2i grid_size = view_window.size();
-
-    vec2u size = rw.getSize();
-    vec2f seg_size;
-    seg_size.x = (float)size.x / (float)(grid_size.x);
-    seg_size.y = (float)size.y / (float)(grid_size.y);
+    vec2i grid_size = m_ViewWindow.size();
 
     for(int y = redraw_window.min.y; y < redraw_window.max.y; y++) {
         for(int x = redraw_window.min.x; x < redraw_window.max.x; x++) {
-            sf::RectangleShape t(seg_size);
-            t.setFillColor(get(x, y).color);
-            t.setPosition({(x - view_window.min.x) * seg_size.x, (float)size.y - (y - view_window.min.y) * seg_size.y});
-            rw.draw(t);
+            //get(x, y).color);
+            //t.setPosition({(x - view_window.min.x), (y - view_window.min.y)});
+            {
+                epi::timer::scope timer("draw_inner");
+                m_Buffer.setPixel(x - m_ViewWindow.min.x, (m_ViewWindow.max.y - y) - m_ViewWindow.min.y, get(x, y).color);
+            }
         }
     }
 }
-void Grid::drawCellAt(int x, int y, AABBi view_window, clr_t color, window_t& rw) {
+void Grid::render(window_t& rw) {
+    sf::Texture tex;
+    tex.loadFromImage(m_Buffer);
+    sf::Sprite spr(tex);
+    vec2f ratio = vec2f((float)rw.getSize().x / tex.getSize().x, (float)rw.getSize().y / tex.getSize().y) ;
+    spr.setPosition(0, 0);
+    spr.setScale(ratio);
+    rw.draw(spr);
+}
+void Grid::drawCellAt(int x, int y, clr_t color, window_t& rw) {
     x = std::clamp<int>(x, 0, m_width);
     y = std::clamp<int>(y, 0, m_height);
-    vec2i grid_size = view_window.size();
+    vec2i grid_size = m_ViewWindow.size();
 
     vec2u size = rw.getSize();
     vec2f seg_size;
@@ -136,11 +143,11 @@ void Grid::drawCellAt(int x, int y, AABBi view_window, clr_t color, window_t& rw
 
     sf::RectangleShape t(seg_size);
     t.setFillColor(color);
-    t.setPosition({(x - view_window.min.x) * seg_size.x, (float)size.y - (y - view_window.min.y) * seg_size.y});
+    t.setPosition({(x - m_ViewWindow.min.x) * seg_size.x, (float)size.y - (y - m_ViewWindow.min.y) * seg_size.y});
     rw.draw(t);
 }
-void Grid::drawSpriteAt(const GridSprite& sprite, vec2i pos, const AABBi& view_window, window_t& rw) {
-    vec2i grid_size = view_window.size();
+void Grid::drawSpriteAt(const GridSprite& sprite, vec2i pos, window_t& rw) {
+    vec2i grid_size = m_ViewWindow.size();
 
     vec2u size = rw.getSize();
     vec2f seg_size;
@@ -156,7 +163,7 @@ void Grid::drawSpriteAt(const GridSprite& sprite, vec2i pos, const AABBi& view_w
         for(int x = 0; x < w; x++) {
             sf::RectangleShape t(seg_size);
             t.setFillColor(sprite.get(x, y));
-            t.setPosition({(pos.x + x - view_window.min.x) * seg_size.x, (float)size.y - (pos.y + y - view_window.min.y) * seg_size.y});
+            t.setPosition({(pos.x + x - m_ViewWindow.min.x) * seg_size.x, (float)size.y - (pos.y + y - m_ViewWindow.min.y) * seg_size.y});
             rw.draw(t);
         }
     }
@@ -182,18 +189,18 @@ void Grid::m_drawSegment(vec2i min, vec2i max, window_t& rw) {
         }
     }
 }
-vec2i Grid::convert_coords(vec2i mouse_pos, AABBi view_window, window_t& window) {
+vec2i Grid::convert_coords(vec2i mouse_pos, window_t& window) {
     vec2f size = window.getDefaultView().getSize();
     vec2f seg_size;
-    seg_size.x = size.x / view_window.size().x;
-    seg_size.y = size.y / view_window.size().y;
+    seg_size.x = size.x / m_ViewWindow.size().x;
+    seg_size.y = size.y / m_ViewWindow.size().y;
     int pos_x = int(mouse_pos.x /  seg_size.x);
     int pos_y = int(size.y/seg_size.y - mouse_pos.y / seg_size.y);
 
-    pos_x = std::clamp<int>(pos_x, 0, view_window.size().x - 1);
-    pos_y = std::clamp<int>(pos_y, 0, view_window.size().y- 1);
+    pos_x = std::clamp<int>(pos_x, 0, m_ViewWindow.size().x - 1);
+    pos_y = std::clamp<int>(pos_y, 0, m_ViewWindow.size().y- 1);
 
-    pos_x += view_window.min.x;
-    pos_y += view_window.min.y;
+    pos_x += m_ViewWindow.min.x;
+    pos_y += m_ViewWindow.min.y;
     return {pos_x, pos_y};
 }

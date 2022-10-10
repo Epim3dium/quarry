@@ -19,6 +19,6 @@ public:
     eEntityType type;
     vec2f pos;
     virtual void update(Grid& grid) {}
-    virtual void draw(const AABBi& view_window, Grid& grid, window_t& rw) {}
+    virtual void draw(Grid& grid, window_t& rw) {}
     Entity(eEntityType type_ = eEntityType::None) : id(m_getNextId()), type(type_) {}
 };

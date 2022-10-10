@@ -15,7 +15,7 @@ void Player::update(Grid& grid) {
     }
     m_rigidbody.update(this, grid);
 }
-void Player::draw(const AABBi& view_window, Grid& grid, window_t& rw) {
+void Player::draw(Grid& grid, window_t& rw) {
     epi::timer::scope timer("player_draw");
     //grouping old pixels that should be cleared
     GridSprite background(size.x, size.y);
@@ -26,6 +26,6 @@ void Player::draw(const AABBi& view_window, Grid& grid, window_t& rw) {
         }
     }
     //drawing pixel buffer
-    grid.drawSpriteAt(background, vec2i(m_last_pos[1]), view_window, rw);
-    grid.drawSpriteAt(sprite, vec2i(pos), view_window, rw);
+    grid.drawSpriteAt(background, vec2i(m_last_pos[1]),  rw);
+    grid.drawSpriteAt(sprite, vec2i(pos),  rw);
 }

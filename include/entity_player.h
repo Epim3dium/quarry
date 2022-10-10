@@ -23,7 +23,7 @@ public:
     float speed = 0.08f;
     float jump_force = 8.f;
     void update(Grid& grid) override;
-    void draw(const AABBi& view_window, Grid& grid, window_t& rw) override;
+    void draw(Grid& grid, window_t& rw) override;
 
     Player(vec2i* move_input) : Entity(eEntityType::Humanoid), m_move_input(move_input), m_sprite(sprite) 
     {

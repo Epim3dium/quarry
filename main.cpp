@@ -77,7 +77,7 @@ int main()
         vec2i mouse_pos = sf::Mouse::getPosition(window);
         if(mouse_pos.x < ImGuiWindowSize.x && mouse_pos.y < ImGuiWindowSize.y)
             return;
-        auto grid_mouse_coords = grid.convert_coords(mouse_pos, VIEW_WINDOW, window); 
+        auto grid_mouse_coords = grid.convert_coords(mouse_pos, window); 
         for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
             for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++)
                 if(grid.inBounds(grid_mouse_coords + vec2i(x, y)) && (grid.get(grid_mouse_coords + vec2i(x, y)).type == eCellType::Air || !ifEmpty))
@@ -97,9 +97,7 @@ int main()
     float last_avg = 60.f;
 
     //needed to avoid flickering caused by sfml's double buffering
-    grid.draw(window);
     window.display();
-    grid.draw(window);
 
     std::flush(std::cout);
     //for imgui
@@ -126,9 +124,7 @@ int main()
                     brush_size -= 1;
                 if(event.key.code == sf::Keyboard::R){
                     grid = Grid(GWW, GWH);
-                    grid.draw(window);
                     window.display();
-                    grid.draw(window);
                     brush_size = DEFAULT_BRUSH_SIZE;
                 }
             }
@@ -167,14 +163,21 @@ int main()
 
         {
             epi::timer::scope timer("grid");
-            grid.redrawChangedSegments(window, VIEW_WINDOW);
-            grid.updateChangedSegments();
+            {
+                epi::timer::scope timer("grid_draw");
+                grid.redrawChangedSegments();
+                grid.render(window);
+            }
+            {
+                epi::timer::scope timer("grid_update");
+                grid.updateChangedSegments();
+            }
         }
         {
             epi::timer::scope timer("player");
             for(auto& player : player_swarm) {
                 player.update(grid);
-                player.draw(VIEW_WINDOW, grid, window);
+                player.draw(grid, window);
             }
         }
 
@@ -238,6 +241,15 @@ int main()
                     on_brush_click = true;
                     brush_size = 1;
                 }
+            }
+            {
+                ImGui::Text("%lf", epi::timer::Get("grid").ms());
+                ImGui::Text("draw");
+                ImGui::Text("%lf", epi::timer::Get("grid_draw").ms());
+                ImGui::Text("%lf", epi::timer::Get("draw_inner").ms());
+                ImGui::Text("update");
+                ImGui::Text("%lf", epi::timer::Get("grid_update").ms());
+
             }
             ImGui::End();
         }

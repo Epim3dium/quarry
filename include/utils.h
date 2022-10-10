@@ -5,6 +5,7 @@
 
 #include "RNG.h"
 #include "remap.h"
+#include "timer.h"
 
 extern RNG g_rng;
 

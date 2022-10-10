@@ -19,6 +19,8 @@ private:
     std::vector<CellVar> m_tmp_plane;
 
     std::vector<AABBi> m_SegmentsToRerender;
+    sf::Image m_Buffer;
+    AABBi m_ViewWindow;
 
     //returned when geet is out of bounds
     CellVar null_obj = CellVar(eCellType::Bedrock);
@@ -31,7 +33,14 @@ private:
     void m_updateSegment(vec2i min, vec2i max);
     void m_drawSegment(vec2i min, vec2i max, window_t& rw);
 public:
-    void m_redrawSegment(AABBi redraw_window, AABBi view_window, window_t& rw);
+    AABBi getViewWindow() const {
+        return m_ViewWindow;
+    }
+    void setViewWindow(AABBi aabb) {
+        m_ViewWindow = aabb;
+        m_Buffer.create(aabb.size().x, aabb.size().y, clr_t::Green);
+    }
+    void m_redrawSegment(AABBi redraw_window);
     std::vector<AABBi> m_ChangedSectors;
 
     size_t time_step = 1;
@@ -65,24 +74,15 @@ public:
         set(v1, t);
     }
 
-    vec2i convert_coords(vec2i mouse_pos, AABBi view_window, window_t& window);
-    void drawCellAt(int x, int y, AABBi view_window, clr_t color, window_t& rw);
-    inline void drawCellAt(int x, int y, clr_t color, window_t& rw) {
-        drawCellAt(x, y, { vec2i(0, 0), vec2i(m_width, m_height) }, color, rw);
-    }
-    void drawSpriteAt(const GridSprite& sprite, vec2i where, const AABBi& view_window, window_t& rw);
+    vec2i convert_coords(vec2i mouse_pos, window_t& window);
+    void drawCellAt(int x, int y, clr_t color, window_t& rw);
+    void drawSpriteAt(const GridSprite& sprite, vec2i where, window_t& rw);
 
     void updateChangedSegments();
 
-    void redrawChangedSegments(window_t& rw, AABBi view_window);
-    inline void redrawChangedSegments(window_t& rw) {
-        redrawChangedSegments(rw, getDefaultViewWindow());
-    }
+    void redrawChangedSegments();
+    void render(window_t& rw);
 
-    inline void draw(window_t& rw) {
-        auto t = getDefaultViewWindow();
-        m_drawSegment(t.min, t.max, rw);
-    }
     inline void update() {
         auto t = getDefaultViewWindow();
         for(int i = 0; i < time_step; i++){
@@ -98,5 +98,6 @@ public:
                     m_plane.push_back(CellVar(eCellType::Bedrock));
                 else
                     m_plane.push_back(CellVar(eCellType::Air));;
+        setViewWindow({{0, 0}, {w, h}});
     }
 };
