@@ -32,24 +32,27 @@ private:
 
     void m_updateSegment(vec2i min, vec2i max);
     void m_drawSegment(vec2i min, vec2i max, window_t& rw);
+
+    void m_redrawSegment(AABBi redraw_window);
 public:
+    std::vector<AABBi> m_ChangedSectors;
     AABBi getViewWindow() const {
         return m_ViewWindow;
     }
     void setViewWindow(AABBi aabb) {
         m_ViewWindow = aabb;
-        m_Buffer.create(aabb.size().x, aabb.size().y, clr_t::Green);
+
+        sf::Image t(m_Buffer);
+        m_Buffer.create(aabb.size().x, aabb.size().y, CellVar::properties[eCellType::Air].colors.front());
+
+        m_Buffer.copy(t, 0, std::clamp<int>(aabb.size().y - t.getSize().y - 1, 0, aabb.size().y));
     }
-    void m_redrawSegment(AABBi redraw_window);
-    std::vector<AABBi> m_ChangedSectors;
 
     size_t time_step = 1;
     inline bool inBounds(int x, int y) {
         return x >= 0 && y >= 0 && x < m_width && y < m_height;
     }
-    inline bool inBounds(vec2i v) {
-        return inBounds(v.x, v.y);
-    }
+    inline bool inBounds(vec2i v) { return inBounds(v.x, v.y); }
     inline AABBi getDefaultViewWindow() {
         return { vec2i(0, 0), vec2i(m_width, m_height) };
     }
@@ -70,13 +73,15 @@ public:
 
     inline void swap_at(vec2i v0, vec2i v1) {
         auto t = get(v0);
-        set(v0, get(v1));
+        t.move_count++;
+        auto tt = get(v1); 
+        tt.move_count++;
+        set(v0, tt);
         set(v1, t);
     }
 
     vec2i convert_coords(vec2i mouse_pos, window_t& window);
-    void drawCellAt(int x, int y, clr_t color, window_t& rw);
-    void drawSpriteAt(const GridSprite& sprite, vec2i where, window_t& rw);
+    void drawCellAt(int x, int y, clr_t color);
 
     void updateChangedSegments();
 
@@ -92,6 +97,7 @@ public:
     }
 
     Grid(int w, int h) : m_width(w), m_height(h) {
+        m_Buffer.create(w, h, CellVar::properties[eCellType::Air].colors.front());
         for(int i = 0; i < h; i++)
             for(int ii = 0; ii < w; ii++)
                 if(i == 0 || i == h - 1 || ii == 0 || ii == w - 1)
@@ -100,4 +106,5 @@ public:
                     m_plane.push_back(CellVar(eCellType::Air));;
         setViewWindow({{0, 0}, {w, h}});
     }
+    friend GridSprite;
 };

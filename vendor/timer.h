@@ -1,58 +1,97 @@
 #pragma once
 #include <chrono>
-#include <unordered_map>
+#include <iostream>
 #include <string>
+#include <vector>
+#include <map>
+#include <numeric>
 
 namespace epi {
     class timer {
-        static std::unordered_map<const char*, std::chrono::duration<double>>& TimeTable() {
-            static std::unordered_map<const char*, std::chrono::duration<double>> s_time_map;
-            return s_time_map;
-        };
-    public:
-        static void clearTimers() {
-            TimeTable().clear();
+        //utils for strcutured time measurement
+        public:
+        typedef  std::chrono::duration<double> duration_t;
+
+        static std::map<std::string, duration_t>& TimeTable() {
+            static std::map<std::string, duration_t> s_time_table;
+            return s_time_table;
         };
 
+        static std::vector<std::string>& CurGroup() {
+            static std::vector<std::string> s_group_vec;
+            return s_group_vec;
+        }
+        static std::string getIdGroup() {
+            std::string s = "";
+            for(auto& g : CurGroup())
+                s += g + ".";
+            return s;
+        }
+
+        //______________
         class scope {
+            std::string id;
+            bool m_isgroup;
+            std::string group;
             std::chrono::time_point<std::chrono::steady_clock> m_start;
-            const char* m_name;
+
         public:
-            scope(const char* name_) : m_name(name_) {
+            scope(std::string ID, bool isGroup = false) : m_isgroup(isGroup) {
                 m_start = std::chrono::steady_clock::now();
+                group = ID;
+                id = getIdGroup() + ID;
+                if(isGroup)
+                    CurGroup().push_back(group);
             }
             ~scope() {
                 auto stop = std::chrono::steady_clock::now();
-                timer::TimeTable()[m_name] += stop - m_start;
+                TimeTable()[id] = stop - m_start;
+                if(m_isgroup) {
+                    for(int i = 0; i < CurGroup().size(); i++)
+                        if(CurGroup()[i] == group) {
+                            CurGroup().erase(CurGroup().begin() + i);
+                            break;
+                        }
+                }
             }
         };
         
+        //______________
         class Get {
-            const char* cur_name;
+            std::string m_id;
+            std::string m_group;
+            static void displayGroup(std::string id, std::ostream& os, std::string preCout = "") {
+                duration_t sum = TimeTable()[id];
+                for(auto t : TimeTable()) {
+                    if(t.first.find(id) == 0 && t.first.size() != id.size()) {
+
+                        //checking if its in not the current id group
+                        std::string str = t.first;
+                        str = t.first.substr(id.size() + 1);
+                        if(str.find(".") != std::string::npos)
+                            continue;
+
+                        os << preCout << t.first << "\t" << t.second / sum * 100.f << "%\n";
+                        displayGroup(t.first, os, preCout + "\t");
+                    }
+                }
+            }
         public:
             double sec() {
-                if(timer::TimeTable().contains(cur_name))
-                    return std::chrono::duration_cast<std::chrono::seconds>(timer::TimeTable().at(cur_name)).count();
-                else
-                    return -1;
+                return std::chrono::duration_cast<std::chrono::seconds>(TimeTable()[m_id]).count();
             }
             double ms() {
-                if(timer::TimeTable().contains(cur_name))
-                    return std::chrono::duration_cast<std::chrono::milliseconds>(timer::TimeTable().at(cur_name)).count();
-                else
-                    return -1;
+                return std::chrono::duration_cast<std::chrono::milliseconds>(TimeTable()[m_id]).count();
             }
             double um() {
-                if(timer::TimeTable().contains(cur_name))
-                    return std::chrono::duration_cast<std::chrono::microseconds>(timer::TimeTable().at(cur_name)).count();
-                else
-                    return -1;
+                return std::chrono::duration_cast<std::chrono::microseconds>(TimeTable()[m_id]).count();
             }
-            Get(const char* name_) : cur_name(name_) {}
+            void displayGroup(std::ostream& os) {
+                os << "total of \"" << m_id << "\" " << ms() << " ms\n";
+                displayGroup(m_id, os);
+            }
+            Get(std::string id) : m_id(id) { }
         };
-        static void Reset(const char* name) {
-            TimeTable()[name] = std::chrono::duration<double>();
-        }
 
     };
 

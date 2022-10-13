@@ -19,6 +19,7 @@ enum class eCellType : unsigned char {
     Sand,
     Cobblestone,
     Dirt,
+    CompressedDirt,
     Crystal,
     //solids
     Stone,
@@ -78,16 +79,13 @@ public:
     eCellType type;
     clr_t color;
     //number of updates
-    unsigned short age;
+    unsigned short move_count = 0;
+    unsigned short age = 0;
 
     union VarUnion {
         struct {
-            unsigned short move_count;
-            struct {
-                bool isSource;
-            }Fire;
-
-        }Unstable;
+            bool isSource;
+        }Fire;
         //everything that uses sand update behaviour
         struct {
             unsigned char branch_count;
@@ -104,6 +102,9 @@ public:
             bool bgrew_grass;
         }Dirt;
         struct {
+            bool isCrumbled;
+        }CompressedDirt;
+        struct {
             unsigned char down_timer_len;
         }Grass;
         struct {
@@ -118,7 +119,7 @@ public:
         return properties[type];
     }
     CellVar(eCellType type_) 
-        : type(type_), id(m_getNextID()), age(0), last_tick_updated(0)
+        : type(type_), id(m_getNextID()), age(0), move_count(0), last_tick_updated(0)
     {
         std::memset(&var, 0, sizeof(VarUnion));
 

@@ -44,6 +44,8 @@ struct AABBi {
         max.y = std::max(max.y, v.y);
     }
 };
+bool AABBvAABB(const AABBi& r1, const AABBi& r2);
+bool VecvAABB(vec2i r1, const AABBi& r2);
 
 bool intersects(const AABBi& a, const AABBi& b);
 
@@ -51,3 +53,13 @@ bool intersects(const AABBi& a, const AABBi& b);
 float angle(vec2f a, vec2f b);
 
 float length(vec2f a);
+
+float sign(float f);
+
+vec2f sign(vec2f v);
+
+vec2f normal(vec2f v);
+
+float dot(vec2f a, vec2f b);
+
+vec2f abs(vec2f v);

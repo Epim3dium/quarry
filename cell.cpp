@@ -30,6 +30,7 @@ const char* to_str(eCellType type) {
         CASE_RETURN(eCellType::Sand);
         CASE_RETURN(eCellType::Cobblestone);
         CASE_RETURN(eCellType::Dirt);
+        CASE_RETURN(eCellType::CompressedDirt);
         CASE_RETURN(eCellType::Crystal);
         CASE_RETURN(eCellType::Stone);
         CASE_RETURN(eCellType::Grass);
@@ -52,13 +53,13 @@ static bool checkSpreadFire(Grid& grid, const vec2i& v, const vec2i& other) {
         //if rolled for fire spread
         if(dice_roll < flammability) {
             CellVar t(eCellType::Fire);
-            t.var.Unstable.Fire.isSource = true;
+            t.var.Fire.isSource = true;
             grid.set(other.x, other.y, t);
             return true;
         //if almost got spread then just chill on the surface
         } else if(dice_roll < flammability * 1.5f) {
             CellVar t(eCellType::Fire);
-            t.var.Unstable.Fire.isSource = true;
+            t.var.Fire.isSource = true;
             grid.set(v, t);
             return true;
         }
@@ -99,35 +100,29 @@ void InitializeProperties() {
                 return other_prop.state == eState::Gas && other_prop.density > CellVar::properties[grid.get(v).type].density;
             };
             //swaps with swappable cells and advances move counter used to deactivate cells that update too much causing fps drops
-            const auto trySwappingAndAdvanceCounter = [&](const vec2i& me, const vec2i& other) {
+            const auto trySwapping = [&](const vec2i& me, const vec2i& other) {
                 if(isSwappable(other.x, other.y)) {
-                    auto t = grid.get(me);
-                    t.var.Unstable.move_count++;
-                    grid.set(me, t);
                     grid.swap_at(me, other);
                     return true;
                 }
                 return false;
             };
             //anihilate if this cell has been active for too long
-            if(me.var.Unstable.move_count >= MAX_SMOKE_UPDATES) {
-                grid.set(v, eCellType::Air);
-            }
-            if(trySwappingAndAdvanceCounter(v, {v.x, v.y + 1}))
+            if(trySwapping(v, {v.x, v.y + 1}))
                 return;
             {
                 //let randomness decide which side goes first to make system more chaotic
                 int first_side_down = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(trySwappingAndAdvanceCounter(v, {v.x + first_side_down, v.y + 1}))
+                if(trySwapping(v, {v.x + first_side_down, v.y + 1}))
                     return;
-                if(trySwappingAndAdvanceCounter(v, {v.x - first_side_down, v.y + 1}))
+                if(trySwapping(v, {v.x - first_side_down, v.y + 1}))
                     return;
             }
             {
                 int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(trySwappingAndAdvanceCounter(v, {v.x + first_side, v.y}))
+                if(trySwapping(v, {v.x + first_side, v.y}))
                     return;
-                if(trySwappingAndAdvanceCounter(v, {v.x - first_side, v.y}))
+                if(trySwapping(v, {v.x - first_side, v.y}))
                     return;
             }
         },
@@ -161,7 +156,7 @@ void InitializeProperties() {
         //powdery
         eState::Powder,
         //density
-        1400,
+        1500,
         //flammability
         0.f,
         //behaviour
@@ -232,6 +227,38 @@ void InitializeProperties() {
         },
         //colors
         {clr_t(120, 90, 15), clr_t(100, 80, 10) }
+    );
+#define COMPRESSED_DIRT_CRUMBLE_PROBABILITY 0.00001f
+    CellVar::properties[eCellType::CompressedDirt] = CellConstants(
+        //powdery
+        eState::Powder,
+        //density
+        2500,
+        //flammability
+        0.f,
+        //behaviour
+        [](vec2i v, Grid& grid) {
+            auto me = grid.get(v);
+            auto isPowderorSolid = [&](vec2i what) {
+                return (grid.get(what).getProperty().state == eState::Powder || grid.get(what).getProperty().state == eState::Soild) && grid.get(what).type != eCellType::CompressedDirt;
+            };
+            bool isUnsupported = false;
+            if(!me.var.CompressedDirt.isCrumbled) {
+                if(isPowderorSolid(vec2i(v.x + 1, v.y)) || isPowderorSolid(vec2i(v.x - 1, v.y)) ) {
+                    isUnsupported = true;
+                    if(g_rng.Random()<COMPRESSED_DIRT_CRUMBLE_PROBABILITY || (grid.get(v.x + 1, v.y).type != eCellType::CompressedDirt && grid.get(v.x - 1, v.y).type != eCellType::CompressedDirt)) {
+                        me.var.CompressedDirt.isCrumbled = true;
+                        grid.set(v, me);
+                    }
+                }
+            }
+            if(me.var.CompressedDirt.isCrumbled || isUnsupported)  {
+                CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
+                return;
+            }
+        },
+        //colors
+        {clr_t(75, 45, 7), clr_t(60, 40, 5) }
     );
     CellVar::properties[eCellType::Crystal] = CellConstants(
         //powdery
@@ -305,34 +332,27 @@ void InitializeProperties() {
                 return (other_prop.state == eState::Liquid || other_prop.state == eState::Gas) && other_prop.density < my_prop.density;
             };
             //check if can be swapped and advance move counter used to limit number of updates caused by each liquid cell
-            const auto trySwappingAndAdvanceCounter = [&](const vec2i& me, const vec2i& other) {
+            const auto trySwapping = [&](const vec2i& me, const vec2i& other) {
                 if(isSwappable(other.x, other.y)) {
-                    auto t = grid.get(me);
-                    t.var.Unstable.move_count++;
-                    grid.set(me, t);
                     grid.swap_at(me, other);
                     return true;
                 }
                 return false;
             };
-            if(grid.get(v).var.Unstable.move_count >= MAX_LIQUID_UPDATES){
-                grid.set(v, eCellType::Air);
-                return;
-            }
-            if(trySwappingAndAdvanceCounter(v, {v.x, v.y - 1}))
+            if(trySwapping(v, {v.x, v.y - 1}))
                 return;
             {
                 int first_side_down = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(trySwappingAndAdvanceCounter(v, {v.x + first_side_down, v.y - 1}))
+                if(trySwapping(v, {v.x + first_side_down, v.y - 1}))
                     return;
-                if(trySwappingAndAdvanceCounter(v, {v.x - first_side_down, v.y - 1}))
+                if(trySwapping(v, {v.x - first_side_down, v.y - 1}))
                     return;
             }
             {
                 int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(trySwappingAndAdvanceCounter(v, {v.x + first_side, v.y})) 
+                if(trySwapping(v, {v.x + first_side, v.y})) 
                     return;
-                if(trySwappingAndAdvanceCounter(v, {v.x - first_side, v.y})) 
+                if(trySwapping(v, {v.x - first_side, v.y})) 
                     return;
             }
         },
@@ -341,6 +361,8 @@ void InitializeProperties() {
         //reaction with lava -> change to smoke
     );
 
+#define REACTION_LAVA_WATER_STEAM false 
+#define REACTION_LAVA_WATER_COBBLE true 
     CellVar::properties[eCellType::Lava] = CellConstants(
         //powdery
         eState::Liquid,
@@ -358,8 +380,16 @@ void InitializeProperties() {
             };
             FOR_CELLS_AROUND_ME(checkWaterAroundMe);
             if(water_where.x != -1 && water_where.y != -1) {
+#if REACTION_LAVA_WATER
                 grid.set(water_where, eCellType::Steam);
+#else
+                grid.set(water_where, eCellType::Air);
+#endif
+#if REACTION_LAVA_WATER_COBBLE
                 grid.set(v, eCellType::Cobblestone);
+#else
+                grid.set(water_where, eCellType::Air);
+#endif
                 return;
             }
             CellVar::properties[eCellType::Water].update_behaviour(v, grid);
@@ -394,9 +424,6 @@ void InitializeProperties() {
             FOR_CELLS_AROUND_ME(annihilateNeighbour);
             
             if(!hasReacted) {
-                auto me = grid.get(v);
-                me.var.Unstable.move_count++;
-                grid.set(v, me);
                 CellVar::properties[eCellType::Water].update_behaviour(v, grid);
             }
         },
@@ -582,7 +609,7 @@ void InitializeProperties() {
                 FOR_CELLS_AROUND_ME(checkSpreadFire);
             }
             //if fire is source
-            if(me.var.Unstable.Fire.isSource == true) {
+            if(me.var.Fire.isSource == true) {
                 //if no flammable material around you
                 if(grid.get(v.x, v.y - 1).getProperty().flammability <= 0.f && grid.get(v.x, v.y + 1).getProperty().flammability <= 0.f &&
                     grid.get(v.x - 1, v.y).getProperty().flammability <= 0.f && grid.get(v.x + 1, v.y).getProperty().flammability <= 0.f)

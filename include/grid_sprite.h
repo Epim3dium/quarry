@@ -9,44 +9,30 @@ class GridSprite {
 
     unsigned int m_width, m_height;
     std::vector<clr_t> buffer;
+    std::vector<clr_t> background;
+    vec2i last_pos = {0xffffff, 0xffffff};
+
+    void m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid);
 public:
-    clr_t* getPixels() {
+    inline clr_t* getPixels() {
         if(buffer.size() != 0)
             return &buffer[0];
         return nullptr;
     }
-    int getWidth() const { return m_width; }
-    int getHeight() const { return m_height; }
+    inline int getWidth() const                     { return m_width; }
+    inline int getHeight() const                    { return m_height; }
     
-    clr_t get(int x, int y) const { 
-        return buffer[x + y * m_width]; 
-    }
-    clr_t get(vec2i v) const {
-        return get(v.x, v.y);
-    }
-    void set(int x, int y, const clr_t& clr) { 
-        buffer[x + y * m_width] = clr; 
-    }
-    void set(vec2i v, const clr_t& clr) {
-        set(v.x, v.y, clr);
-    }
+    inline clr_t get(int x, int y) const            { return buffer[x + y * m_width];     }
+    inline clr_t get(vec2i v) const                 { return get(v.x, v.y);   }
 
-    GridSprite(unsigned int w, unsigned int h, clr_t clr = clr_t::Transparent) : m_width(w), m_height(h), buffer(w*h, clr) {}
-    GridSprite(unsigned int w, unsigned int h, std::vector<clr_t> clrs) : m_width(w), m_height(h), buffer(clrs) {}
-    GridSprite(const char* filename) {
+    inline void set(int x, int y, const clr_t& clr) { buffer[x + y * m_width] = clr;  }
+    inline void set(vec2i v, const clr_t& clr)      { set(v.x, v.y, clr);     }
 
-        std::vector<unsigned char> png;
+    void drawAt(vec2i pos, Grid& grid);
 
-        //load and decode
-        unsigned error = lodepng::load_file(png, filename);
+    GridSprite(unsigned int w, unsigned int h, clr_t clr = clr_t::Transparent) : m_width(w), m_height(h), buffer(w*h, clr) { background = buffer; }
+    GridSprite(unsigned int w, unsigned int h, std::vector<clr_t> clrs) : m_width(w), m_height(h), buffer(clrs) { background = buffer; }
 
-        static_assert(sizeof(unsigned char) == sizeof(sf::Uint8));
-
-        if(!error) error = lodepng::decode(*(std::vector<unsigned char>*)&buffer, m_width, m_height, png);
-        std::reverse(buffer.begin(), buffer.end());
-
-        //if there's an error, display it
-        if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
-    }
+    GridSprite(const char* filename);
     friend Grid;
 };

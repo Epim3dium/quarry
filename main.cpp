@@ -8,13 +8,13 @@
 #include "utils.h"
 #include "grid.h"
 #include "timer.h"
-#include "entity_player.h"
+#include "grid_sprite.h"
 
 #define WW 2048.f
 #define WH 2048.f
 
-#define GWW 258
-#define GWH 258
+#define GWW 512
+#define GWH 512
 
 #define DEFAULT_BRUSH_SIZE (sqrt(GWW * GWH) / 32 / 2)
 
@@ -44,11 +44,67 @@ void setupImGuiFont() {
     ImGui::SFML::UpdateFontTexture();
 }
 
+class Ball {
+    const static GridSprite g_sprite;
+    GridSprite spr;
+public:
+    struct {
+        float bounciness = 0.1f;
+        float drag = 0.03f;
+        size_t raycast_c = 16U;
+        float friction = 0.1f;
+    }physics;
+    void draw(Grid& g) {
+        spr.drawAt((vec2i)pos, g);
+    }
+    void update(Grid& g) {
+        auto isCollidable = [&](const CellVar& cv) {
+            return cv.getProperty().density > 1000;
+        };
+        float vl = length(vel);
+        vec2f vn = normal(vel);
+        if(abs(vel.x) > 0.001f || abs(vel.y) > 0.001f)
+            vel -= vn * vl * vl * physics.drag;
+        vec2f col_n = {0, 0};
+        for(size_t i = 0; i < physics.raycast_c; i++) {
+            float ang = ((float)i / physics.raycast_c) * 2.f * 3.141f;
+            vec2f dir = vec2f(sinf(ang), cosf(ang));
+            vec2f point = pos + dir * radius;
+            if(isCollidable(g.get(point.x, point.y)))
+                col_n -= dir;
+        }
+        if(length(col_n) != 0.f) {
+            col_n = normal(col_n);
+            float d = std::clamp(dot(vel, col_n), -INFINITY, 0.f);
+
+            float a = atan2(col_n.x, col_n.y);
+            a -= atan2(vn.x, vn.y);
+            a = abs(a);
+
+            auto remap = Remap<float, float>(0.f, 1.f, 1.f, 50.f);
+
+            vel.x -= (1.f + physics.bounciness) * (col_n.x * d); 
+            vel.y -= (1.f + physics.bounciness) * (col_n.y * d);
+
+            vel *= 1.f - physics.friction * abs(sin(a));
+        }
+        pos += vel;
+    }
+
+    float radius = 5.0f;
+    vec2f vel = {0, 0};
+    vec2f pos;
+    Ball(vec2f p) : pos(p), spr(g_sprite) {}
+};
+const GridSprite Ball::g_sprite("./assets/player.png");
+
 int main()
 {
     InitializeProperties();
 
     Grid grid(GWW, GWH);
+    grid.setViewWindow(VIEW_WINDOW);
+    Ball ball(vec2f(50, 50));
     //player.pos = vec2f((float)GWW / 2, 10);
     
     int brush_size = DEFAULT_BRUSH_SIZE;
@@ -64,15 +120,12 @@ int main()
     imgui_flags |= ImGuiWindowFlags_NoCollapse;
 
     ImGui::SFML::Init(window);
-    vec2f ImGuiWindowSize(WW/5, WH);
+    vec2f ImGuiWindowSize(WW/5, WH / 2);
 
     //setting font to something more readable and bigger
     setupImGuiFont();
 
     vec2i player_input = {0, 0};
-    std::vector<Player> player_swarm;
-    player_swarm.push_back(&player_input);
-    player_swarm.back().pos = vec2f{(float)GWW / 2, 10};
     const auto& spawnAtBrush = [&](bool ifEmpty = false) {
         vec2i mouse_pos = sf::Mouse::getPosition(window);
         if(mouse_pos.x < ImGuiWindowSize.x && mouse_pos.y < ImGuiWindowSize.y)
@@ -120,12 +173,18 @@ int main()
                 if(event.key.code == sf::Keyboard::Num0)
                     brush_size += 1;
 
+                if(event.key.code == sf::Keyboard::Up) {
+                    ball.vel.y = 3;
+                }
                 if(event.key.code == sf::Keyboard::Num9)
                     brush_size -= 1;
                 if(event.key.code == sf::Keyboard::R){
                     grid = Grid(GWW, GWH);
                     window.display();
                     brush_size = DEFAULT_BRUSH_SIZE;
+                }
+                if(event.key.code == sf::Keyboard::V){
+                    grid.setViewWindow(grid.getDefaultViewWindow());
                 }
             }
             else if(event.type == sf::Event::MouseButtonPressed) {
@@ -152,6 +211,7 @@ int main()
 
 
         player_input = {0, 0};
+        float player_speed = 0.05f;
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
             player_input.y = 1;
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
@@ -160,53 +220,53 @@ int main()
             player_input.x = -1;
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
             player_input.x = 1;
+        if(player_input.x != 0 || player_input.y != 0)
+            ball.vel.x += (float)player_input.x * player_speed;
 
         {
-            epi::timer::scope timer("grid");
+            epi::timer::scope timer("grid", true);
             {
-                epi::timer::scope timer("grid_draw");
+                epi::timer::scope timer("draw");
                 grid.redrawChangedSegments();
-                grid.render(window);
             }
             {
-                epi::timer::scope timer("grid_update");
+                epi::timer::scope timer("update");
                 grid.updateChangedSegments();
             }
         }
         {
-            epi::timer::scope timer("player");
-            for(auto& player : player_swarm) {
-                player.update(grid);
-                player.draw(grid, window);
-            }
+            ball.vel.y -= 0.07f;
+            ball.update(grid);
+            ball.draw(grid);
         }
-
         if(show_updated_segments){
             clr_t color(255, 0, 255, updated_segments_opacity);
             for(auto& cur : grid.m_ChangedSectors) {
                 for(int x = cur.min.x; x < cur.max.x; x++) {
                     int y = cur.max.y - 1;
-                    grid.drawCellAt(x, y, color, window); 
+                    grid.drawCellAt(x, y, color); 
                 }
                 for(int x = cur.min.x; x < cur.max.x; x++) {
                     int y = cur.min.y;
-                    grid.drawCellAt(x, y, color, window); 
+                    grid.drawCellAt(x, y, color); 
                 }
                 for(int y = cur.min.y; y < cur.max.y; y++) {
                     int x = cur.min.x;
-                    grid.drawCellAt(x, y, color, window); 
+                    grid.drawCellAt(x, y, color); 
                 }
                 for(int y = cur.min.y; y < cur.max.y; y++) {
                     int x = cur.max.x - 1;
-                    grid.drawCellAt(x, y, color, window); 
+                    grid.drawCellAt(x, y, color); 
                 }
             }
         }
+        grid.render(window);
+
 
         //imgui window
         {
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSize(ImVec2(WW / 5, WH), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(ImGuiWindowSize.x, ImGuiWindowSize.y), ImGuiCond_FirstUseEver);
 
             ImGui::Begin("Demo window", nullptr, imgui_flags);
 
@@ -241,15 +301,6 @@ int main()
                     on_brush_click = true;
                     brush_size = 1;
                 }
-            }
-            {
-                ImGui::Text("%lf", epi::timer::Get("grid").ms());
-                ImGui::Text("draw");
-                ImGui::Text("%lf", epi::timer::Get("grid_draw").ms());
-                ImGui::Text("%lf", epi::timer::Get("draw_inner").ms());
-                ImGui::Text("update");
-                ImGui::Text("%lf", epi::timer::Get("grid_update").ms());
-
             }
             ImGui::End();
         }
