@@ -104,6 +104,7 @@ int main()
 
     Grid grid(GWW, GWH);
     grid.setViewWindow(VIEW_WINDOW);
+    grid.toggleDebug = true;
     Ball ball(vec2f(50, 50));
     //player.pos = vec2f((float)GWW / 2, 10);
     
@@ -239,27 +240,7 @@ int main()
             ball.update(grid);
             ball.draw(grid);
         }
-        if(show_updated_segments){
-            clr_t color(255, 0, 255, updated_segments_opacity);
-            for(auto& cur : grid.m_ChangedSectors) {
-                for(int x = cur.min.x; x < cur.max.x; x++) {
-                    int y = cur.max.y - 1;
-                    grid.drawCellAt(x, y, color); 
-                }
-                for(int x = cur.min.x; x < cur.max.x; x++) {
-                    int y = cur.min.y;
-                    grid.drawCellAt(x, y, color); 
-                }
-                for(int y = cur.min.y; y < cur.max.y; y++) {
-                    int x = cur.min.x;
-                    grid.drawCellAt(x, y, color); 
-                }
-                for(int y = cur.min.y; y < cur.max.y; y++) {
-                    int x = cur.max.x - 1;
-                    grid.drawCellAt(x, y, color); 
-                }
-            }
-        }
+        window.clear();
         grid.render(window);
 
 

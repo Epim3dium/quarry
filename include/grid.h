@@ -8,6 +8,8 @@
 
 class GridSprite;
 
+#define UPDATE_SEG_SIZE 8
+
 class Grid {
 private:
     size_t m_width;
@@ -17,6 +19,11 @@ private:
 
     std::vector<CellVar> m_plane;
     std::vector<CellVar> m_tmp_plane;
+    struct SegInfo {
+        bool toUpdate = false;
+        bool toUpdateNextFrame = false;
+    };
+    std::vector<SegInfo> m_section_list;
 
     std::vector<AABBi> m_SegmentsToRerender;
     sf::Image m_Buffer;
@@ -34,8 +41,14 @@ private:
     void m_drawSegment(vec2i min, vec2i max, window_t& rw);
 
     void m_redrawSegment(AABBi redraw_window);
+    void m_update(AABBi redraw_window);
+    void m_updateSection(size_t index);
+
+
+    std::vector<AABBi> m_debugDraws;
+    void m_drawDebug(window_t& window);
 public:
-    std::vector<AABBi> m_ChangedSectors;
+    bool toggleDebug = false;
     AABBi getViewWindow() const {
         return m_ViewWindow;
     }
@@ -96,7 +109,7 @@ public:
         }
     }
 
-    Grid(int w, int h) : m_width(w), m_height(h) {
+    Grid(int w, int h) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_SIZE * h / UPDATE_SEG_SIZE) {
         m_Buffer.create(w, h, CellVar::properties[eCellType::Air].colors.front());
         for(int i = 0; i < h; i++)
             for(int ii = 0; ii < w; ii++)

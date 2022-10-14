@@ -2,34 +2,23 @@
 #include "timer.h"
 #include "grid_sprite.h"
 
-#define MAX_CHANGED_SEG_DIST 64.f
 void Grid::set(int x, int y, const CellVar& cv) {
-        AABBi* cur_sector = nullptr;
-        for(auto& seg : m_ChangedSectors) {
-            if(seg.contains({x, y})) {
-                cur_sector = &seg;
-                break;
-            }
-            if(seg.distance(x, y) > MAX_CHANGED_SEG_DIST)
-                continue;
-            cur_sector = &seg;
-            cur_sector->min.x = std::min(x, cur_sector->min.x);
-            cur_sector->min.y = std::min(y, cur_sector->min.y);
-
-            cur_sector->max.x = std::max(x, cur_sector->max.x);
-            cur_sector->max.y = std::max(y, cur_sector->max.y);
-            break;
+        int id_x = x / UPDATE_SEG_SIZE;
+        int id_y = y / UPDATE_SEG_SIZE;
+        m_section_list[id_x + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
+        if(x % UPDATE_SEG_SIZE == 0 && id_x != 0) {
+            m_section_list[id_x - 1 + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
         }
-        if(cur_sector == nullptr) {
-            m_ChangedSectors.push_back({ {0xffffff, 0xffffff}, {0, 0} });
-            cur_sector = &m_ChangedSectors.back();
-            cur_sector->min.x = std::min(x, cur_sector->min.x);
-            cur_sector->min.y = std::min(y, cur_sector->min.y);
-
-            cur_sector->max.x = std::max(x, cur_sector->max.x);
-            cur_sector->max.y = std::max(y, cur_sector->max.y);
+        if(x % UPDATE_SEG_SIZE == UPDATE_SEG_SIZE - 1 && id_x != m_width / UPDATE_SEG_SIZE - 1) {
+            m_section_list[id_x + 1 + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
         }
-            
+        if(y % UPDATE_SEG_SIZE == 0 && id_y != 0) {
+            m_section_list[id_x + (id_y - 1) * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
+        }
+        if(y % UPDATE_SEG_SIZE == UPDATE_SEG_SIZE - 1 && id_y != m_height / UPDATE_SEG_SIZE - 1) {
+            m_section_list[id_x + (id_y + 1) * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
+        }
+
 
         if(!inBounds(x, y))
             exit(1);
@@ -45,26 +34,39 @@ void Grid::m_updateSegment(vec2i min, vec2i max) {
     max.y = std::clamp<int>(max.y, min.y + 1, m_height);
 
     bool left_to_right = tick_passed_total % 2;
+    bool up_to_down = tick_passed_total % 4 < 2;
+#define UP_DOWN\
+        for(int y = max.y - 1; y >= min.y; y--)
+#define DOWN_UP\
+        for(int y = min.y; y < max.y; y++)
+#define LEFT_RIGHT\
+        for(int x = min.x; x < max.x; x++)
+#define RIGHT_LEFT\
+        for(int x = max.x - 1; x >= min.x; x--)
+    if(up_to_down) {
+        if(left_to_right)
+            UP_DOWN
+                LEFT_RIGHT
+                    updateCell(x, y);
+        else 
+            UP_DOWN
+               RIGHT_LEFT 
+                    updateCell(x, y);
+    }else {
+        if(left_to_right)
+           DOWN_UP 
+                LEFT_RIGHT
+                    updateCell(x, y);
+        else 
+           DOWN_UP 
+               RIGHT_LEFT 
+                    updateCell(x, y);
 
-    m_tmp_plane = m_plane;
-    if(left_to_right)
-        for(int y = min.y; y < max.y; y++) {
-            for(int x = min.x; x < max.x; x++) {
-                updateCell(x, y);
-            }
-        }
-    else 
-        for(int y = min.y; y < max.y; y++) {
-            for(int x = max.x - 1; x >= min.x; x--) {
-                updateCell(x, y);
-            }
-        }
+    }
 }
 #define MAX_MOVE_COUNT 1024U
 void Grid::updateCell(int x, int y) {
     if(get(x, y).type == eCellType::Air)
-        return;
-    if(get(x, y).getID() != m_tmp_plane[m_idx(x, y)].getID())
         return;
     if(get(x, y).last_tick_updated >= tick_passed_total) 
         return;
@@ -78,36 +80,71 @@ void Grid::updateCell(int x, int y) {
     m_plane[m_idx(x, y)].age++;
     cur_prop.update_behaviour({x, y}, *this);
 }
+void Grid::m_updateSection(size_t index) {
+    bool shouldUpdate = m_section_list[index].toUpdate;
+    m_section_list[index].toUpdate = false;
+    if(m_section_list[index].toUpdateNextFrame) {
+        m_section_list[index].toUpdate = true;
+        m_section_list[index].toUpdateNextFrame = false;
+    }
+    if(!shouldUpdate)
+        return;
+
+    int bl_x = (index * UPDATE_SEG_SIZE) % m_width;
+    int bl_y = (index * UPDATE_SEG_SIZE) / m_width * UPDATE_SEG_SIZE;
+    AABBi seg = {vec2i(bl_x, bl_y), vec2i(bl_x + UPDATE_SEG_SIZE, bl_y + UPDATE_SEG_SIZE)};
+    m_SegmentsToRerender.push_back(seg);
+
+    if(AABBvAABB(seg, m_ViewWindow))
+        m_updateSegment(seg.min, seg.max);
+}
 #define CHANGED_SEGMENT_PADDING 2
 void Grid::updateChangedSegments() {
-    std::vector<AABBi> tmp = m_ChangedSectors;
-    m_ChangedSectors.clear();
-
-    for(int i = 0; i < time_step; i++) {
-        tick_passed_total ++;
-        for(auto& seg : tmp) {
-            auto t = seg;
-            m_SegmentsToRerender.push_back(t);
-            seg = { {(int)0xffffff, (int)0xffffff}, {(int)0, (int)0} };
-
-            vec2i padding = {CHANGED_SEGMENT_PADDING, CHANGED_SEGMENT_PADDING};
-            t.min -= padding;
-            t.max += padding;
-            if(AABBvAABB(t, m_ViewWindow))
-                m_updateSegment(t.min, t.max);
-        }
+    tick_passed_total ++;
+    for(size_t i = 0; i < m_section_list.size(); i++) {
+        if((i % (m_width / UPDATE_SEG_SIZE)) % 2 == 0)
+            m_updateSection(i);
+    }
+    for(size_t i = 0; i < m_section_list.size(); i++) {
+        if((i % (m_width / UPDATE_SEG_SIZE)) % 2 == 1)
+            m_updateSection(i);
     }
 };
 void Grid::redrawChangedSegments() {
     for(auto& seg : m_SegmentsToRerender) {
-        vec2i padding = {CHANGED_SEGMENT_PADDING, CHANGED_SEGMENT_PADDING};
         if(seg.min.x != (int)0xffffff )
-            m_redrawSegment({ seg.min - padding, seg.max + padding});
+            m_redrawSegment(seg);
     }
+    if(toggleDebug)
+        m_debugDraws = m_SegmentsToRerender;
     m_SegmentsToRerender.clear();
 }
 
 //redraw window defines what segment should be redrawn and view_window the size of full window that should fit on the screen
+void Grid::m_drawDebug(window_t& rw) {
+    vec2f ratio = vec2f((float)rw.getSize().x / m_ViewWindow.size().x, (float)rw.getSize().y / m_ViewWindow.size().y) ;
+    for(auto& seg : m_debugDraws) {
+        sf::Vertex line[2];
+        line[0] = sf::Vertex(vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y));
+        line[1] = sf::Vertex(vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y));
+
+        line[0].color = clr_t::Green;
+        line[1].color = clr_t::Green;
+        rw.draw(line, 2, sf::Lines);
+
+        line[0].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y);
+        line[1].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y);
+        rw.draw(line, 2, sf::Lines);
+        line[0].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y);
+        line[1].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y);
+        rw.draw(line, 2, sf::Lines);
+        line[0].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y);
+        line[1].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y);
+        rw.draw(line, 2, sf::Lines);
+
+    }
+    m_debugDraws.clear();
+}
 void Grid::m_redrawSegment(AABBi redraw_window) {
 
     redraw_window.min.x = std::clamp<int>(redraw_window.min.x, 0, m_width - 1);
@@ -138,6 +175,9 @@ void Grid::render(window_t& rw) {
     spr.setPosition(0, 0);
     spr.setScale(ratio);
     rw.draw(spr);
+
+    if(toggleDebug)
+        m_drawDebug(rw);
 }
 void Grid::drawCellAt(int x, int y, clr_t color) {
     x = std::clamp<int>(x, 0, m_width);
