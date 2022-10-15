@@ -1,8 +1,8 @@
-#include "grid_sprite.h"
-#include "grid.h"
+#include "sprite.h"
+#include "core.h"
 #include "utils.h"
 
-void GridSprite::m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid) {
+void QuarrySprite::m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid) {
     vec2i grid_size = grid.m_ViewWindow.size();
 
     int w = getWidth();
@@ -17,7 +17,7 @@ void GridSprite::m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid) {
         }
     }
 }
-void GridSprite::drawAt(vec2i pos, Grid& grid) {
+void QuarrySprite::drawAt(vec2i pos, Grid& grid) {
     auto size = vec2i(m_width, m_height);
     if(last_pos.x != 0xffffff && last_pos.y != 0xffffff) {
         for(int y = 0; y < m_width; y++) {
@@ -36,7 +36,7 @@ void GridSprite::drawAt(vec2i pos, Grid& grid) {
     last_pos = pos;
 }
 
-GridSprite::GridSprite(const char* filename) {
+QuarrySprite::QuarrySprite(const char* filename) {
     std::vector<unsigned char> png;
 
     //load and decode

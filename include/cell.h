@@ -21,6 +21,8 @@ enum class eCellType : unsigned char {
     Dirt,
     CompressedDirt,
     Crystal,
+
+    CrumblingStone,
     //solids
     Stone,
     //special
@@ -60,8 +62,6 @@ struct CellConstants {
         : state(state_of_matter), density(density_), flammability(flammability_), update_behaviour( update_func_), colors(colors_) {}
 };
 
-void InitializeProperties();
-
 struct CellVar {
 private:
     unsigned int m_getNextID() {
@@ -71,10 +71,12 @@ private:
     unsigned int id;
     unsigned int last_tick_updated;
 
-    unsigned long getID() const {return id;}
-public:
-    //if not working means you havent called InitializeProperties()
+
     static std::map<eCellType, CellConstants> properties;
+public:
+    unsigned long getID() const {return id;}
+
+    //if not working means you havent called InitializeProperties()
 
     eCellType type;
     clr_t color;
@@ -105,6 +107,10 @@ public:
             bool isCrumbled;
         }CompressedDirt;
         struct {
+            unsigned char lvl;
+            bool hasCrumbled;
+        }CrumblingStone;
+        struct {
             unsigned char down_timer_len;
         }Grass;
         struct {
@@ -127,4 +133,5 @@ public:
         color = all_colors[ g_rng.Random<size_t>(0U, all_colors.size()) ];
     }
     friend Grid;
+    static void InitializeProperties();
 };

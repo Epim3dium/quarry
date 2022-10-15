@@ -1,6 +1,8 @@
-#include "cell.h"
-#include "grid.h"
 #include <random>
+
+#include "cell.h"
+#include "core.h"
+#include "opt.h"
 
 //TODO:
 //Cobblestone + water = dirt
@@ -31,6 +33,7 @@ const char* to_str(eCellType type) {
         CASE_RETURN(eCellType::Cobblestone);
         CASE_RETURN(eCellType::Dirt);
         CASE_RETURN(eCellType::CompressedDirt);
+        CASE_RETURN(eCellType::CrumblingStone);
         CASE_RETURN(eCellType::Crystal);
         CASE_RETURN(eCellType::Stone);
         CASE_RETURN(eCellType::Grass);
@@ -67,7 +70,7 @@ static bool checkSpreadFire(Grid& grid, const vec2i& v, const vec2i& other) {
     return false;
 };
 
-void InitializeProperties() {
+void CellVar::InitializeProperties() {
     //Empty space
     CellVar::properties[eCellType::Air] = CellConstants(
         //powdery
@@ -83,7 +86,6 @@ void InitializeProperties() {
         //colors
         {clr_t(10, 20, 50)}
     );
-#define MAX_SMOKE_UPDATES (10 * 60)
     CellVar::properties[eCellType::Smoke] = CellConstants(
         //powdery
         eState::Gas,
@@ -129,9 +131,6 @@ void InitializeProperties() {
         //colors
         {clr_t(130, 130, 130) }
     );
-#define bSTEAM_CONDENSATES false
-#define STEAM_CONDENSATION_CHANCE 0.001f
-#define STEAM_MIN_AGE_TO_CONDENSATE 90
     CellVar::properties[eCellType::Steam] = CellConstants(
         //powdery
         eState::Gas,
@@ -192,7 +191,6 @@ void InitializeProperties() {
         //colors
         {clr_t(150, 150, 150), clr_t(100, 100, 100) }
     );
-#define DIRT_TO_GRASS_REQ_TIME 120
     CellVar::properties[eCellType::Dirt] = CellConstants(
         //powdery
         eState::Powder,
@@ -228,7 +226,6 @@ void InitializeProperties() {
         //colors
         {clr_t(120, 90, 15), clr_t(100, 80, 10) }
     );
-#define COMPRESSED_DIRT_CRUMBLE_PROBABILITY 0.00001f
     CellVar::properties[eCellType::CompressedDirt] = CellConstants(
         //powdery
         eState::Powder,
@@ -259,6 +256,40 @@ void InitializeProperties() {
         },
         //colors
         {clr_t(75, 45, 7), clr_t(60, 40, 5) }
+    );
+#define MAX_CRUMBLING_STONE_PROPAGATION 25
+#define CRUMBLING_STONE_RNG_RANGE 3
+    CellVar::properties[eCellType::CrumblingStone] = CellConstants(
+        //powdery
+        eState::Powder,
+        //density
+        2700,
+        //flammability
+        0.f,
+        //behaviour
+        [](vec2i v, Grid& grid) {
+            auto me = grid.get(v);
+            if(me.var.CrumblingStone.lvl != 0 && !me.var.CrumblingStone.hasCrumbled) {
+                if(me.var.CrumblingStone.lvl < MAX_CRUMBLING_STONE_PROPAGATION) {
+                    vec2i dirs[] = {vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1)};
+                    for(auto d : dirs) {
+                        auto t = grid.get(v + d);
+                        t.var.CrumblingStone.lvl = me.var.CrumblingStone.lvl + g_rng.Random(1, CRUMBLING_STONE_RNG_RANGE);
+                        grid.set(v + d, t);
+                    }
+                }
+                me.var.CrumblingStone.hasCrumbled = true;
+                grid.set(v, me);
+            }
+            if(me.var.CrumblingStone.hasCrumbled) {
+                CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
+                return;
+            } else {
+
+            }
+        },
+        //colors
+        {clr_t(45, 45, 60), clr_t(40, 40, 50) }
     );
     CellVar::properties[eCellType::Crystal] = CellConstants(
         //powdery
@@ -316,7 +347,6 @@ void InitializeProperties() {
         {clr_t(70, 70, 70)}
     );
     //liquids keep eating framerate so i need a limiter
-#define MAX_LIQUID_UPDATES (60 * 10)
     CellVar::properties[eCellType::Water] = CellConstants(
         //powdery
         eState::Liquid,
@@ -361,8 +391,6 @@ void InitializeProperties() {
         //reaction with lava -> change to smoke
     );
 
-#define REACTION_LAVA_WATER_STEAM false 
-#define REACTION_LAVA_WATER_COBBLE true 
     CellVar::properties[eCellType::Lava] = CellConstants(
         //powdery
         eState::Liquid,
@@ -396,8 +424,6 @@ void InitializeProperties() {
         },
         {clr_t(220, 90, 30)}
     );
-#define ACID_REACTION_PROBABILITY 0.05f
-#define ACID_SMOKE_PROBABILITY 0.1f
     CellVar::properties[eCellType::Acid] = CellConstants(
         //powdery
         eState::Liquid,
@@ -455,13 +481,6 @@ void InitializeProperties() {
         },
         {clr_t(30, 120, 30)}
     );
-#define TREE_MIN_INITIAL_SIZE 15
-#define TREE_MAX_INTTIAL_SIZE 25
-
-#define TREE_MIN_BRANCH_SIZE 5
-#define TREE_MAX_BRANCH_SIZE 10
-#define TREE_BRANCH_GROW_CHANCE 0.5f
-#define TREETOP_RADIUS 5
 
     CellVar::properties[eCellType::Seed] = CellConstants(
         //powdery
@@ -553,7 +572,6 @@ void InitializeProperties() {
         //colors
         {clr_t(90, 40, 10)}
     );
-#define LEAF_DUPE_CHANCE 0.5f
     CellVar::properties[eCellType::Leaf] = CellConstants(
         //powdery
         eState::Soild,
@@ -587,12 +605,6 @@ void InitializeProperties() {
         {clr_t(50, 150, 50), clr_t(50, 170, 50), clr_t(50, 200, 50)}
     );
 //determines flame size
-#define MAX_FIRE_LIFETIME 30 
-#define MIN_FIRE_LIFETIME 10 
-    
-#define SMOKE_CHANCE 0.05f
-
-#define FIRE_COLOR_BLEND_AREA_HEIGHT 5
     CellVar::properties[eCellType::Fire] = CellConstants(
         eState::Gas,
         //density

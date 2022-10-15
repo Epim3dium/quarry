@@ -1,29 +1,44 @@
-#include "grid.h"
+#include "core.h"
 #include "timer.h"
-#include "grid_sprite.h"
+#include "sprite.h"
+#include "opt.h"
 
-void Grid::set(int x, int y, const CellVar& cv) {
-        int id_x = x / UPDATE_SEG_SIZE;
-        int id_y = y / UPDATE_SEG_SIZE;
-        m_section_list[id_x + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
-        if(x % UPDATE_SEG_SIZE == 0 && id_x != 0) {
-            m_section_list[id_x - 1 + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
-        }
-        if(x % UPDATE_SEG_SIZE == UPDATE_SEG_SIZE - 1 && id_x != m_width / UPDATE_SEG_SIZE - 1) {
-            m_section_list[id_x + 1 + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
-        }
-        if(y % UPDATE_SEG_SIZE == 0 && id_y != 0) {
-            m_section_list[id_x + (id_y - 1) * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
-        }
-        if(y % UPDATE_SEG_SIZE == UPDATE_SEG_SIZE - 1 && id_y != m_height / UPDATE_SEG_SIZE - 1) {
-            m_section_list[id_x + (id_y + 1) * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
-        }
-
-
-        if(!inBounds(x, y))
-            exit(1);
-        m_plane[m_idx(x, y)] = cv;
+Grid::Grid(int w, int h) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_SIZE * h / UPDATE_SEG_SIZE){
+    if(CellVar::properties.size() != (int)eCellType::Bedrock + 1) {
+        std::cerr << "Properties uninitialized";
+        std::exit(0);
     }
+    m_Buffer.create(w, h, CellVar::properties[eCellType::Air].colors.front());
+    for(int i = 0; i < h; i++)
+        for(int ii = 0; ii < w; ii++)
+            if(i == 0 || i == h - 1 || ii == 0 || ii == w - 1)
+                m_plane.push_back(CellVar(eCellType::Bedrock));
+            else
+                m_plane.push_back(CellVar(eCellType::Air));;
+    setViewWindow({{0, 0}, {w, h}});
+}
+void Grid::set(int x, int y, const CellVar& cv) {
+    int id_x = x / UPDATE_SEG_SIZE;
+    int id_y = y / UPDATE_SEG_SIZE;
+    m_section_list[id_x + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
+    if(x % UPDATE_SEG_SIZE == 0 && id_x != 0) {
+        m_section_list[id_x - 1 + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
+    }
+    if(x % UPDATE_SEG_SIZE == UPDATE_SEG_SIZE - 1 && id_x != m_width / UPDATE_SEG_SIZE - 1) {
+        m_section_list[id_x + 1 + id_y * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
+    }
+    if(y % UPDATE_SEG_SIZE == 0 && id_y != 0) {
+        m_section_list[id_x + (id_y - 1) * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
+    }
+    if(y % UPDATE_SEG_SIZE == UPDATE_SEG_SIZE - 1 && id_y != m_height / UPDATE_SEG_SIZE - 1) {
+        m_section_list[id_x + (id_y + 1) * m_width / UPDATE_SEG_SIZE].toUpdateNextFrame = true;
+    }
+
+
+    if(!inBounds(x, y))
+        exit(1);
+    m_plane[m_idx(x, y)] = cv;
+}
 void Grid::m_updateSegment(vec2i min, vec2i max) {
     epi::timer::scope timer("update");
     //high cap has to be 1 less so that max will not be equal min
@@ -33,38 +48,24 @@ void Grid::m_updateSegment(vec2i min, vec2i max) {
     max.x = std::clamp<int>(max.x, min.x + 1, m_width);
     max.y = std::clamp<int>(max.y, min.y + 1, m_height);
 
+    //other sides to prevent weird lags
     bool left_to_right = tick_passed_total % 2;
-    bool up_to_down = tick_passed_total % 4 < 2;
-#define UP_DOWN\
-        for(int y = max.y - 1; y >= min.y; y--)
 #define DOWN_UP\
         for(int y = min.y; y < max.y; y++)
 #define LEFT_RIGHT\
         for(int x = min.x; x < max.x; x++)
 #define RIGHT_LEFT\
         for(int x = max.x - 1; x >= min.x; x--)
-    if(up_to_down) {
-        if(left_to_right)
-            UP_DOWN
-                LEFT_RIGHT
-                    updateCell(x, y);
-        else 
-            UP_DOWN
-               RIGHT_LEFT 
-                    updateCell(x, y);
-    }else {
-        if(left_to_right)
-           DOWN_UP 
-                LEFT_RIGHT
-                    updateCell(x, y);
-        else 
-           DOWN_UP 
-               RIGHT_LEFT 
-                    updateCell(x, y);
+    if(left_to_right)
+       DOWN_UP 
+            LEFT_RIGHT
+                updateCell(x, y);
+    else 
+       DOWN_UP 
+           RIGHT_LEFT 
+                updateCell(x, y);
 
-    }
 }
-#define MAX_MOVE_COUNT 1024U
 void Grid::updateCell(int x, int y) {
     if(get(x, y).type == eCellType::Air)
         return;
@@ -98,16 +99,36 @@ void Grid::m_updateSection(size_t index) {
     if(AABBvAABB(seg, m_ViewWindow))
         m_updateSegment(seg.min, seg.max);
 }
-#define CHANGED_SEGMENT_PADDING 2
 void Grid::updateChangedSegments() {
     tick_passed_total ++;
-    for(size_t i = 0; i < m_section_list.size(); i++) {
-        if((i % (m_width / UPDATE_SEG_SIZE)) % 2 == 0)
-            m_updateSection(i);
-    }
-    for(size_t i = 0; i < m_section_list.size(); i++) {
-        if((i % (m_width / UPDATE_SEG_SIZE)) % 2 == 1)
-            m_updateSection(i);
+    bool side_x = g_rng.Random() > 0.5f;
+    bool side_y = g_rng.Random() > 0.5f;
+
+    //if((i % (m_width / UPDATE_SEG_SIZE)) % 2 == 0)
+    int ctr = 0;
+    int id_y = 0;
+    if(side_y)
+        id_y = m_height / UPDATE_SEG_SIZE - 1;
+    while(id_y >= 0 && id_y < m_height / UPDATE_SEG_SIZE) {
+        int id_x = 0;
+        if(side_x)
+            id_x = m_width / UPDATE_SEG_SIZE - 1;
+        while(id_x >= 0 && id_x < m_width / UPDATE_SEG_SIZE) {
+            //
+                m_updateSection(id_x + id_y * m_width / UPDATE_SEG_SIZE);
+            //
+            if(side_x) {
+                id_x--;
+            } else {
+                id_x++;
+            }
+        }
+        //
+        if(side_y) {
+            id_y--;
+        } else {
+            id_y++;
+        }
     }
 };
 void Grid::redrawChangedSegments() {
@@ -207,8 +228,8 @@ void Grid::m_drawSegment(vec2i min, vec2i max, window_t& rw) {
         }
     }
 }
-vec2i Grid::convert_coords(vec2i mouse_pos, window_t& window) {
-    vec2f size = window.getDefaultView().getSize();
+vec2i Grid::convert_coords(vec2i mouse_pos, vec2f window_size) {
+    vec2f size = window_size;
     vec2f seg_size;
     seg_size.x = size.x / m_ViewWindow.size().x;
     seg_size.y = size.y / m_ViewWindow.size().y;

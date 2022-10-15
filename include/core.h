@@ -6,9 +6,8 @@
 #include "utils.h"
 #include "cell.h"
 
-class GridSprite;
+class QuarrySprite;
 
-#define UPDATE_SEG_SIZE 8
 
 class Grid {
 private:
@@ -93,7 +92,7 @@ public:
         set(v1, t);
     }
 
-    vec2i convert_coords(vec2i mouse_pos, window_t& window);
+    vec2i convert_coords(vec2i mouse_pos, vec2f win_size);
     void drawCellAt(int x, int y, clr_t color);
 
     void updateChangedSegments();
@@ -109,15 +108,6 @@ public:
         }
     }
 
-    Grid(int w, int h) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_SIZE * h / UPDATE_SEG_SIZE) {
-        m_Buffer.create(w, h, CellVar::properties[eCellType::Air].colors.front());
-        for(int i = 0; i < h; i++)
-            for(int ii = 0; ii < w; ii++)
-                if(i == 0 || i == h - 1 || ii == 0 || ii == w - 1)
-                    m_plane.push_back(CellVar(eCellType::Bedrock));
-                else
-                    m_plane.push_back(CellVar(eCellType::Air));;
-        setViewWindow({{0, 0}, {w, h}});
-    }
-    friend GridSprite;
+    Grid(int w, int h);
+    friend QuarrySprite;
 };

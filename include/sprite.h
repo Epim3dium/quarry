@@ -5,7 +5,7 @@
 
 class Grid;
 
-class GridSprite {
+class QuarrySprite {
 
     unsigned int m_width, m_height;
     std::vector<clr_t> buffer;
@@ -30,9 +30,9 @@ public:
 
     void drawAt(vec2i pos, Grid& grid);
 
-    GridSprite(unsigned int w, unsigned int h, clr_t clr = clr_t::Transparent) : m_width(w), m_height(h), buffer(w*h, clr) { background = buffer; }
-    GridSprite(unsigned int w, unsigned int h, std::vector<clr_t> clrs) : m_width(w), m_height(h), buffer(clrs) { background = buffer; }
+    QuarrySprite(unsigned int w, unsigned int h, clr_t clr = clr_t::Transparent) : m_width(w), m_height(h), buffer(w*h, clr) { background = buffer; }
+    QuarrySprite(unsigned int w, unsigned int h, std::vector<clr_t> clrs) : m_width(w), m_height(h), buffer(clrs) { background = buffer; }
 
-    GridSprite(const char* filename);
+    QuarrySprite(const char* filename);
     friend Grid;
 };
