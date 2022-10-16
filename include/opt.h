@@ -1,5 +1,6 @@
 #pragma once
 
+#define THREADED_UPDATE true 
 #define UPDATE_SEG_SIZE 8
 #define MAX_MOVE_COUNT 2048U
 

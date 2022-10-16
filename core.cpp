@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "core.h"
 #include "timer.h"
 #include "sprite.h"
@@ -100,21 +102,54 @@ void Grid::m_updateSection(size_t index) {
 }
 void Grid::updateChangedSegments() {
     tick_passed_total ++;
+#if THREADED_UPDATE
+    size_t thread_c = std::thread::hardware_concurrency();
+#else
+    size_t thread_c = 1;
+#endif
+    //if((i % (m_width / UPDATE_SEG_SIZE)) % 2 == 0)
     bool side_x = g_rng.Random() > 0.5f;
     bool side_y = g_rng.Random() > 0.5f;
 
-    //if((i % (m_width / UPDATE_SEG_SIZE)) % 2 == 0)
-    int ctr = 0;
-    int id_y = 0;
-    if(side_y)
-        id_y = m_height / UPDATE_SEG_SIZE - 1;
-    while(id_y >= 0 && id_y < m_height / UPDATE_SEG_SIZE) {
+    auto analyzeRow = [&](int id_y, bool invert) {
         int id_x = 0;
-        if(side_x)
+        if(invert)
             id_x = m_width / UPDATE_SEG_SIZE - 1;
         while(id_x >= 0 && id_x < m_width / UPDATE_SEG_SIZE) {
             //
                 m_updateSection(id_x + id_y * m_width / UPDATE_SEG_SIZE);
+            //
+            if(invert) {
+                id_x--;
+            } else {
+                id_x++;
+            }
+        }
+    };
+    auto analyzeCol = [&](int id_x, bool invert) {
+        int id_y = 0;
+        if(invert)
+            id_y = m_height / UPDATE_SEG_SIZE - 1;
+        while(id_y >= 0 && id_y < m_height / UPDATE_SEG_SIZE) {
+            //
+                m_updateSection(id_x + id_y * m_width / UPDATE_SEG_SIZE);
+            //
+            if(invert) {
+                id_y--;
+            } else {
+                id_y++;
+            }
+        }
+    };
+    std::vector<std::thread> workers;
+    auto analyzeOnlyDivisible = [&](int id, bool fhalf) {
+        int id_y = 0;
+        int id_x = 0;
+        if(side_x)
+            id_x = m_width / UPDATE_SEG_SIZE - 1;
+        while(id_x >= 0 && id_x < m_width / UPDATE_SEG_SIZE) {
+            if(id_x % thread_c == id && id_x % 2 == fhalf)
+                analyzeCol(id_x, side_y);
             //
             if(side_x) {
                 id_x--;
@@ -122,13 +157,22 @@ void Grid::updateChangedSegments() {
                 id_x++;
             }
         }
-        //
-        if(side_y) {
-            id_y--;
-        } else {
-            id_y++;
+    };
+    for(int i = 0; i < thread_c; i++)
+        workers.push_back(std::thread(analyzeOnlyDivisible, i, true));
+    for(auto& w : workers)
+        if(w.joinable())
+            w.join();
+    for(int i = 0; i < thread_c; i++)
+        workers.push_back(std::thread(analyzeOnlyDivisible, i, false));
+    for(auto& w : workers)
+        if(w.joinable())
+            w.join();
+    /*
+    auto analyzeSections = [&](bool even_x, bool odd_x, bool even_y, bool odd_y) {
         }
-    }
+    };
+    */
 };
 void Grid::redrawChangedSegments() {
     for(auto& seg : m_SegmentsToRerender) {
