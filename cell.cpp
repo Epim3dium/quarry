@@ -47,6 +47,53 @@ const char* to_str(eCellType type) {
     }
     return "none";
 }
+static void handleBasicPowder(vec2i v, Grid& grid) {
+    const auto isSwappable = [&](const int& otherx, const int& othery) {
+        auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
+        return other_prop.state == eState::Liquid || other_prop.state == eState::Gas || 
+            (other_prop.state == eState::Powder  && other_prop.density < CellVar::properties[grid.get(v).type].density);
+    };
+    if(isSwappable(v.x, v.y - 1)) {
+        grid.swap_at(v, {v.x, v.y -1});
+        return;
+    }
+    int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
+    if(isSwappable(v.x + first_side, v.y - 1))
+        grid.swap_at(v, {v.x + first_side, v.y - 1});
+    else if(isSwappable(v.x - first_side, v.y - 1))
+        grid.swap_at(v, {v.x - first_side, v.y - 1});
+}
+static void handleBasicLiquid(vec2i v, Grid& grid) {
+    const auto isSwappable = [&](const int& otherx, const int& othery) {
+        auto& my_prop = CellVar::properties[grid.get(v).type]; 
+        auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
+        return (other_prop.state == eState::Liquid || other_prop.state == eState::Gas) && other_prop.density < my_prop.density;
+    };
+    //check if can be swapped and advance move counter used to limit number of updates caused by each liquid cell
+    const auto trySwapping = [&](const vec2i& me, const vec2i& other) {
+        if(isSwappable(other.x, other.y)) {
+            grid.swap_at(me, other);
+            return true;
+        }
+        return false;
+    };
+    if(trySwapping(v, {v.x, v.y - 1}))
+        return;
+    {
+        int first_side_down = g_rng.Random() > 0.5f ? 1 : -1; 
+        if(trySwapping(v, {v.x + first_side_down, v.y - 1}))
+            return;
+        if(trySwapping(v, {v.x - first_side_down, v.y - 1}))
+            return;
+    }
+    {
+        int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
+        if(trySwapping(v, {v.x + first_side, v.y})) 
+            return;
+        if(trySwapping(v, {v.x - first_side, v.y})) 
+            return;
+    }
+}
 
 //returns true if fire has spread
 static bool checkSpreadFire(Grid& grid, const vec2i& v, const vec2i& other) {
@@ -159,23 +206,7 @@ void CellVar::InitializeProperties() {
         //flammability
         0.f,
         //behaviour
-        [](vec2i v, Grid& grid) {
-            const auto isSwappable = [&](const int& otherx, const int& othery) {
-                auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
-                return other_prop.state == eState::Liquid || other_prop.state == eState::Gas || 
-                    (other_prop.state == eState::Powder  && other_prop.density < CellVar::properties[grid.get(v).type].density);
-            };
-            if(isSwappable(v.x, v.y - 1)) {
-                grid.swap_at(v, {v.x, v.y -1});
-                return;
-            }
-            int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
-            if(isSwappable(v.x + first_side, v.y - 1))
-                grid.swap_at(v, {v.x + first_side, v.y - 1});
-            else if(isSwappable(v.x - first_side, v.y - 1))
-                grid.swap_at(v, {v.x - first_side, v.y - 1});
-            return;
-        },
+        handleBasicPowder,
         //colors
         {clr_t(220, 220, 80), clr_t(250, 250, 40) }
     );
@@ -187,7 +218,7 @@ void CellVar::InitializeProperties() {
         //flammability
         0.f,
         //behaviour
-        CellVar::properties[eCellType::Sand].update_behaviour,
+        handleBasicPowder,
         //colors
         {clr_t(150, 150, 150), clr_t(100, 100, 100) }
     );
@@ -221,7 +252,7 @@ void CellVar::InitializeProperties() {
                     grid.set(v, me);
                 }
             }
-            CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
+            handleBasicPowder(v, grid);
         },
         //colors
         {clr_t(120, 90, 15), clr_t(100, 80, 10) }
@@ -250,7 +281,7 @@ void CellVar::InitializeProperties() {
                 }
             }
             if(me.var.CompressedDirt.isCrumbled || isUnsupported)  {
-                CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
+                handleBasicPowder(v, grid);
                 return;
             }
         },
@@ -282,7 +313,7 @@ void CellVar::InitializeProperties() {
                 grid.set(v, me);
             }
             if(me.var.CrumblingStone.hasCrumbled) {
-                CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
+                handleBasicPowder(v, grid);
                 return;
             } else {
 
@@ -326,7 +357,7 @@ void CellVar::InitializeProperties() {
                     grid.set(v, me);
                 }
             }else {
-                CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
+                handleBasicPowder(v, grid);
             }
         },
         //colors
@@ -355,37 +386,7 @@ void CellVar::InitializeProperties() {
         //flammability
         0.f,
         //behaviour
-        [](vec2i v, Grid& grid) {
-            const auto isSwappable = [&](const int& otherx, const int& othery) {
-                auto& my_prop = CellVar::properties[grid.get(v).type]; 
-                auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
-                return (other_prop.state == eState::Liquid || other_prop.state == eState::Gas) && other_prop.density < my_prop.density;
-            };
-            //check if can be swapped and advance move counter used to limit number of updates caused by each liquid cell
-            const auto trySwapping = [&](const vec2i& me, const vec2i& other) {
-                if(isSwappable(other.x, other.y)) {
-                    grid.swap_at(me, other);
-                    return true;
-                }
-                return false;
-            };
-            if(trySwapping(v, {v.x, v.y - 1}))
-                return;
-            {
-                int first_side_down = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(trySwapping(v, {v.x + first_side_down, v.y - 1}))
-                    return;
-                if(trySwapping(v, {v.x - first_side_down, v.y - 1}))
-                    return;
-            }
-            {
-                int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
-                if(trySwapping(v, {v.x + first_side, v.y})) 
-                    return;
-                if(trySwapping(v, {v.x - first_side, v.y})) 
-                    return;
-            }
-        },
+        handleBasicLiquid,
         //colors
         {clr_t(50, 50, 150)}
         //reaction with lava -> change to smoke
@@ -420,7 +421,7 @@ void CellVar::InitializeProperties() {
 #endif
                 return;
             }
-            CellVar::properties[eCellType::Water].update_behaviour(v, grid);
+            handleBasicLiquid(v, grid);
         },
         {clr_t(220, 90, 30)}
     );
@@ -434,6 +435,7 @@ void CellVar::InitializeProperties() {
         //behaviour
         [](vec2i v, Grid& grid) {
             bool hasReacted = false;
+            grid.set(v, grid.get(v));
             const auto& annihilateNeighbour = [&](Grid& g, vec2i v, vec2i other) {
                 if(grid.get(other).getProperty().state == eState::Gas || grid.get(other).type == eCellType::Acid || grid.get(other).type == eCellType::Bedrock)
                     return;
@@ -450,7 +452,7 @@ void CellVar::InitializeProperties() {
             FOR_CELLS_AROUND_ME(annihilateNeighbour);
             
             if(!hasReacted) {
-                CellVar::properties[eCellType::Water].update_behaviour(v, grid);
+                handleBasicLiquid(v, grid);
             }
         },
         {clr_t(150, 250, 40)}
@@ -466,6 +468,15 @@ void CellVar::InitializeProperties() {
         0.5f,
         //behaviour
         [](vec2i v, Grid& grid) {
+            if(grid.get(v).var.Grass.my_dirt_id == 0 ) {
+                auto t = grid.get(v);
+                if(grid.get(v.x, v.y - 1).type == eCellType::Dirt) {
+                    t.var.Grass.my_dirt_id = grid.get(v.x, v.y - 1).getID() % 255;
+                } else {
+                    t.var.Grass.my_dirt_id = 255;
+                }
+                grid.set(v, t);
+            }
             if(grid.get(v).var.Grass.down_timer_len > 0) {
                 auto me = grid.get(v);
                 me.var.Grass.down_timer_len -= 1;
@@ -473,13 +484,10 @@ void CellVar::InitializeProperties() {
                 if(grid.get(v.x, v.y + 1).getProperty().state == eState::Gas)
                     grid.set(v.x, v.y + 1, me);
             }
-            if(grid.get(v.x, v.y - 1).getProperty().state == eState::Gas || grid.get(v.x, v.y - 1).getProperty().state == eState::Liquid) {
-                grid.swap_at(v, {v.x, v.y - 1});
-            }
-            if(grid.get(v.x, v.y - 1).type != eCellType::Grass)
-                CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
+            if(grid.get(v.x, v.y - 1).type != eCellType::Grass && !(grid.get(v.x, v.y - 1).type == eCellType::Dirt && grid.get(v.x, v.y - 1).getID() % 255 == grid.get(v).var.Grass.my_dirt_id))
+                grid.set(v, CellVar(eCellType::Air));
         },
-        {clr_t(30, 120, 30)}
+        {clr_t(30, 120, 30), clr_t(35, 130, 35)}
     );
 
     CellVar::properties[eCellType::Seed] = CellConstants(
@@ -500,7 +508,7 @@ void CellVar::InitializeProperties() {
                 grid.set(v.x, v.y, t);
             }
             else {
-                CellVar::properties[eCellType::Sand].update_behaviour(v, grid);
+                handleBasicPowder(v, grid);
             }
         },
         //colors

@@ -39,6 +39,7 @@ void CircleRigidbody::update(Grid& g, vec2f& pos) {
     }
     if(g.get((vec2i)pos).getProperty().state == eState::Liquid) {
         vel.y += (g.get((vec2i)pos).getProperty().density - physics.density) / 1000.f;
+        vel.x *= 1.f - (g.get((vec2i)pos).getProperty().density - physics.density) / 1000.f;
     }
     pos += vel;
 }

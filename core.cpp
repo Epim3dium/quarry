@@ -3,18 +3,12 @@
 #include "sprite.h"
 #include "opt.h"
 
-Grid::Grid(int w, int h) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_SIZE * h / UPDATE_SEG_SIZE){
+Grid::Grid(int w, int h) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_SIZE * h / UPDATE_SEG_SIZE), m_plane(w * h, CellVar(eCellType::Air)){
     if(CellVar::properties.size() != (int)eCellType::Bedrock + 1) {
         std::cerr << "Properties uninitialized";
         std::exit(0);
     }
     m_Buffer.create(w, h, CellVar::properties[eCellType::Air].colors.front());
-    for(int i = 0; i < h; i++)
-        for(int ii = 0; ii < w; ii++)
-            if(i == 0 || i == h - 1 || ii == 0 || ii == w - 1)
-                m_plane.push_back(CellVar(eCellType::Bedrock));
-            else
-                m_plane.push_back(CellVar(eCellType::Air));;
     setViewWindow({{0, 0}, {w, h}});
 }
 void Grid::set(int x, int y, const CellVar& cv) {
@@ -96,7 +90,12 @@ void Grid::m_updateSection(size_t index) {
     AABBi seg = {vec2i(bl_x, bl_y), vec2i(bl_x + UPDATE_SEG_SIZE, bl_y + UPDATE_SEG_SIZE)};
     m_SegmentsToRerender.push_back(seg);
 
-    if(AABBvAABB(seg, m_ViewWindow))
+    auto ext_ViewWindow = m_ViewWindow;
+    auto s = ext_ViewWindow.size();
+    ext_ViewWindow.min -= s;
+    ext_ViewWindow.max += s;
+
+    if(AABBvAABB(seg, ext_ViewWindow))
         m_updateSegment(seg.min, seg.max);
 }
 void Grid::updateChangedSegments() {
@@ -168,22 +167,19 @@ void Grid::m_drawDebug(window_t& rw) {
 }
 void Grid::m_redrawSegment(AABBi redraw_window) {
 
-    redraw_window.min.x = std::clamp<int>(redraw_window.min.x, 0, m_width - 1);
-    redraw_window.min.y = std::clamp<int>(redraw_window.min.y, 0, m_height - 1);
+    redraw_window.min.x = std::clamp<int>(redraw_window.min.x, m_ViewWindow.min.x, m_ViewWindow.max.x - 1);
+    redraw_window.min.y = std::clamp<int>(redraw_window.min.y, m_ViewWindow.min.y, m_ViewWindow.max.y - 1);
 
-    redraw_window.max.x = std::clamp<int>(redraw_window.max.x, redraw_window.min.x + 1, m_width);
-    redraw_window.max.y = std::clamp<int>(redraw_window.max.y, redraw_window.min.y + 1, m_height);
+    redraw_window.max.x = std::clamp<int>(redraw_window.max.x, redraw_window.min.x + 1, m_ViewWindow.max.x);
+    redraw_window.max.y = std::clamp<int>(redraw_window.max.y, redraw_window.min.y + 1, m_ViewWindow.max.y);
     //^^clamping everything
-    vec2i grid_size = m_ViewWindow.size();
 
     for(int y = redraw_window.min.y; y < redraw_window.max.y; y++) {
         for(int x = redraw_window.min.x; x < redraw_window.max.x; x++) {
             //get(x, y).color);
             //t.setPosition({(x - view_window.min.x), (y - view_window.min.y)});
             {
-                epi::timer::scope timer("draw_inner");
-                if(inBounds(x - m_ViewWindow.min.x, m_ViewWindow.max.y - y - m_ViewWindow.min.y - 1))
-                    m_Buffer.setPixel(x - m_ViewWindow.min.x, m_ViewWindow.max.y - y - m_ViewWindow.min.y - 1, get(x, y).color);
+                m_Buffer.setPixel(x - m_ViewWindow.min.x, m_ViewWindow.size().y - (y - m_ViewWindow.min.y) - 1, get(x, y).color);
             }
         }
     }
@@ -205,7 +201,7 @@ void Grid::drawCellAt(int x, int y, clr_t color) {
     y = std::clamp<int>(y, 0, m_height);
     vec2i grid_size = m_ViewWindow.size();
 
-    m_Buffer.setPixel(x - m_ViewWindow.min.x, (m_ViewWindow.max.y - y) - m_ViewWindow.min.y, color);
+    m_Buffer.setPixel(x - m_ViewWindow.min.x, m_ViewWindow.size().y - (y - m_ViewWindow.min.y) - 1, color);
 }
 void Grid::m_drawSegment(vec2i min, vec2i max, window_t& rw) {
     min.x = std::clamp<int>(min.x, 0, m_width);
@@ -231,8 +227,10 @@ void Grid::m_drawSegment(vec2i min, vec2i max, window_t& rw) {
 vec2i Grid::convert_coords(vec2i mouse_pos, vec2f window_size) {
     vec2f size = window_size;
     vec2f seg_size;
+
     seg_size.x = size.x / m_ViewWindow.size().x;
     seg_size.y = size.y / m_ViewWindow.size().y;
+
     int pos_x = int(mouse_pos.x /  seg_size.x);
     int pos_y = int(size.y/seg_size.y - mouse_pos.y / seg_size.y);
 

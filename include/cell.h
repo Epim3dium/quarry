@@ -72,8 +72,8 @@ private:
     unsigned int last_tick_updated;
 
 
-    static std::map<eCellType, CellConstants> properties;
 public:
+    static std::map<eCellType, CellConstants> properties;
     unsigned long getID() const {return id;}
 
     //if not working means you havent called InitializeProperties()
@@ -112,6 +112,7 @@ public:
         }CrumblingStone;
         struct {
             unsigned char down_timer_len;
+            unsigned char my_dirt_id;
         }Grass;
         struct {
             unsigned char down_timer_len;

@@ -15,8 +15,8 @@
 #define WW 2048.f
 #define WH 2048.f
 
-#define GWW 512
-#define GWH 512
+#define GWW 1024
+#define GWH 1024
 
 #define DEFAULT_BRUSH_SIZE (sqrt(GWW * GWH) / 32 / 2)
 
@@ -51,17 +51,34 @@ class Ball {
 public:
     QuarrySprite spr;
     CircleRigidbody rb;
+    //in degrees
+    float grounded_check_angle = 35.f;
+    size_t grounded_check_count = 5;
+
+    vec2f pos;
+    bool isGrounded = true;
+    bool isSemiGrounded = true;
+
     void draw(Grid& g) {
         spr.drawAt((vec2i)pos, g);
     }
     void update(Grid& g) {
         rb.update(g, pos);
+        isGrounded = false;
+        isSemiGrounded = false;
+        for(float a = -grounded_check_angle / 2.f; a < grounded_check_angle; a += grounded_check_angle / grounded_check_count) {
+            float rad = a / 360.f * 2.f * 3.141f;
+            auto cur_check = g.get(pos.x + sin(rad) * rb.radius * 1.5f, pos.y - cos(rad) * rb.radius * 1.5f);
+            if(cur_check.getProperty().state == eState::Powder || cur_check.getProperty().state == eState::Soild)
+                isGrounded = true;
+        }
+        if(g.get((vec2i)pos).getProperty().state == eState::Liquid)
+            isSemiGrounded = true;
     }
 
-    vec2f pos;
     Ball() : spr(g_sprite) {}
     Ball(vec2f p) : pos(p), spr(g_sprite) {
-        rb.radius = 5.f;
+        rb.radius = roundf(spr.getHeight() / 2.f);
         rb.physics.density = 900;
     }
 };
@@ -74,6 +91,7 @@ public:
     int brush_size = DEFAULT_BRUSH_SIZE;
     bool on_brush_click = false;
     eCellType brush_material = eCellType::Sand;
+    vec2i last_mouse_pos = {-1, -1};
 
     vec2f ImGuiWindowSize = vec2f(WW/5, WH / 2);
 
@@ -98,6 +116,9 @@ public:
         }
     };
     void update(Grid& grid) override {
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !on_brush_click) {
+            spawnAtBrush(grid);
+        }
         spawnMaterial(grid, sf::Keyboard::A, eCellType::Acid);
         spawnMaterial(grid, sf::Keyboard::O, eCellType::Wood);
         spawnMaterial(grid, sf::Keyboard::D, eCellType::Dirt);
@@ -123,6 +144,7 @@ public:
         ball.rb.vel.y -= 0.07f;
         ball.update(grid);
         ball.draw(grid);
+        //ball.draw(grid);
         {
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(ImGuiWindowSize.x, ImGuiWindowSize.y), ImGuiCond_FirstUseEver);
@@ -166,7 +188,6 @@ public:
     }
     bool setup(Grid& grid) override {
         grid.setViewWindow(VIEW_WINDOW);
-        grid.toggleDebug = true;
         addKeyHook(sf::Keyboard::Q, 
             [&]() {
                 auto t = brush_size;
@@ -176,7 +197,10 @@ public:
             });
         addKeyHook(sf::Keyboard::Up, 
             [&]() {
-                ball.rb.vel.y = 3;
+                if(ball.isGrounded)
+                    ball.rb.vel.y = 3.f;
+                if(ball.isSemiGrounded)
+                    ball.rb.vel.y += 1.f;
             });
         addKeyHook(sf::Keyboard::R, 
             [&]() {
@@ -187,6 +211,31 @@ public:
             [&]() {
                 grid.setViewWindow(grid.getDefaultViewWindow());
             });
+        addKeyHook(sf::Keyboard::Space, 
+            [&]() {
+                if(last_mouse_pos.x == -1) {
+                    last_mouse_pos = getMousePos();
+                    last_mouse_pos = grid.convert_coords(last_mouse_pos, p_window_size);
+                }
+            }, eKeyHookState::isPressed);
+        addKeyHook(sf::Keyboard::Space, 
+            [&]() {
+                AABBi new_view;
+
+                vec2i this_mouse_pos = getMousePos();
+                this_mouse_pos= grid.convert_coords(this_mouse_pos, p_window_size);
+
+                new_view.min.x = std::min(this_mouse_pos.x, last_mouse_pos.x);
+                new_view.min.y = std::min(this_mouse_pos.y, last_mouse_pos.y);
+                new_view.max.x = std::max(this_mouse_pos.x, last_mouse_pos.x);
+                new_view.max.y = std::max(this_mouse_pos.y, last_mouse_pos.y);
+                int max_size = std::max(new_view.size().x, new_view.size().y);
+                new_view.max.x = new_view.min.x + max_size;
+                new_view.max.y = new_view.min.y + max_size;
+
+                grid.setViewWindow(new_view);
+                last_mouse_pos.x = -1;
+            }, eKeyHookState::isReleased);
 
         return true;
     }
@@ -210,7 +259,5 @@ int main()
         */
     Demo app;
     app.run();
-
-
     return 0;
 }

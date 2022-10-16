@@ -32,8 +32,12 @@ void QuarryApp::run() {
             if (event.type == sf::Event::Closed)
                 window.close();
             else if(event.type == sf::Event::KeyPressed) {
-                if(keypress_hooks.find(event.key.code) != keypress_hooks.end() && keypress_hooks.at(event.key.code).state == eKeyHookState::isPressed)
-                    keypress_hooks.at(event.key.code).func();
+                if(pressed_keypress_hooks.find(event.key.code) != pressed_keypress_hooks.end())
+                    pressed_keypress_hooks[event.key.code]();
+            }
+            else if(event.type == sf::Event::KeyReleased) {
+                if(released_keypress_hooks.find(event.key.code) != released_keypress_hooks.end())
+                    released_keypress_hooks[event.key.code]();
             }
             else if(event.type == sf::Event::KeyReleased) {
             }
@@ -43,15 +47,13 @@ void QuarryApp::run() {
         }
         ImGui::SFML::Update(window, ImGuiClock.restart());
         //game loop
+        grid.redrawChangedSegments();
         update(grid);
 
-        grid.redrawChangedSegments();
         grid.updateChangedSegments();
         grid.render(window);
 
-
         ImGui::SFML::Render(window);
-        window.display();
         {
             auto end = std::chrono::high_resolution_clock::now();
             float fps = (float)1e9/(float)std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
@@ -60,6 +62,7 @@ void QuarryApp::run() {
             fps_array.push_back(fps);
             p_avg_fps = (float)std::accumulate(fps_array.begin(), fps_array.end(), 0) / fps_array.size();
         }
+        window.display();
     }
 }
 QuarryApp::QuarryApp(vec2i grid_size_, vec2f win_resolution) 

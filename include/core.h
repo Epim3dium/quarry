@@ -17,7 +17,6 @@ private:
     size_t tick_passed_total = 0;
 
     std::vector<CellVar> m_plane;
-    std::vector<CellVar> m_tmp_plane;
     struct SegInfo {
         bool toUpdate = false;
         bool toUpdateNextFrame = false;
@@ -57,7 +56,7 @@ public:
         sf::Image t(m_Buffer);
         m_Buffer.create(aabb.size().x, aabb.size().y, CellVar::properties[eCellType::Air].colors.front());
 
-        m_Buffer.copy(t, 0, std::clamp<int>(aabb.size().y - t.getSize().y - 1, 0, aabb.size().y));
+        m_redrawSegment(aabb);
     }
 
     size_t time_step = 1;
@@ -65,6 +64,11 @@ public:
         return x >= 0 && y >= 0 && x < m_width && y < m_height;
     }
     inline bool inBounds(vec2i v) { return inBounds(v.x, v.y); }
+    inline bool inView(int x, int y) { 
+        return 
+            x >= m_ViewWindow.min.x  && x < m_ViewWindow.max.x &&
+            y >= m_ViewWindow.min.y  && y < m_ViewWindow.max.y;
+    }
     inline AABBi getDefaultViewWindow() {
         return { vec2i(0, 0), vec2i(m_width, m_height) };
     }

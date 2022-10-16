@@ -17,12 +17,8 @@ class QuarryApp {
     sf::Clock sec_clock;
     float last_avg = 60.f;
 
-    struct KeyHookInfo{
-        std::function<void(void)> func;
-        eKeyHookState state;
-        KeyHookInfo() {}
-    };
-    std::map<sf::Keyboard::Key, KeyHookInfo> keypress_hooks;
+    std::map<sf::Keyboard::Key,std::function<void(void)> > pressed_keypress_hooks;
+    std::map<sf::Keyboard::Key,std::function<void(void)> > released_keypress_hooks;
     window_t window;
 
 protected:
@@ -37,8 +33,15 @@ protected:
 
     inline void exit() { isActive = false; }
     inline void addKeyHook(sf::Keyboard::Key key, std::function<void(void)> func, eKeyHookState state = eKeyHookState::isPressed) {
-        keypress_hooks[key].func = func;
-        keypress_hooks[key].state = state;
+        switch(state) {
+            case eKeyHookState::isPressed :
+                pressed_keypress_hooks[key] = func;
+                break;
+            case eKeyHookState::isReleased :
+                released_keypress_hooks[key] = func;
+                break;
+
+        }
     }
 public:
     virtual bool setup(Grid& grid) { return true; }
