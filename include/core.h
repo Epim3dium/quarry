@@ -8,7 +8,10 @@
 
 class QuarrySprite;
 
-
+struct SegInfo {
+    bool toUpdate = false;
+    bool toUpdateNextFrame = false;
+};
 class Grid {
 private:
     size_t m_width;
@@ -17,10 +20,7 @@ private:
     size_t tick_passed_total = 0;
 
     std::vector<CellVar> m_plane;
-    struct SegInfo {
-        bool toUpdate = false;
-        bool toUpdateNextFrame = false;
-    };
+
     std::vector<SegInfo> m_section_list;
 
     std::vector<AABBi> m_SegmentsToRerender;
@@ -36,17 +36,23 @@ private:
     void updateCell(int x, int y);
 
     void m_updateSegment(vec2i min, vec2i max);
-    void m_drawSegment(vec2i min, vec2i max, window_t& rw);
-
     void m_redrawSegment(AABBi redraw_window);
     void m_update(AABBi redraw_window);
-    void m_updateSection(size_t index);
+
+    void m_analyzeRow(int id_y);
 
 
-    std::vector<AABBi> m_debugDraws;
+    std::vector<AABBi> m_debugAABBDraw;
+    std::vector<AABBi> m_debugAABBUpdate;
     void m_drawDebug(window_t& window);
 public:
-    bool toggleDebug = false;
+    struct {
+        bool isActive = false;
+        bool showUpdated = true;
+        bool showDraws = true;
+        clr_t update_clr = clr_t::Red;
+        clr_t draw_clr = clr_t::Green;
+    }debug;
     AABBi getViewWindow() const {
         return m_ViewWindow;
     }

@@ -1,8 +1,10 @@
 #pragma once
 
 #define THREADED_UPDATE true 
-#define UPDATE_SEG_SIZE 8
 #define MAX_MOVE_COUNT 2048U
+
+#define UPDATE_SEG_W 16
+#define UPDATE_SEG_H 16
 
 #define bSTEAM_CONDENSATES false
 #define STEAM_CONDENSATION_CHANCE 0.001f

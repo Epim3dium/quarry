@@ -23,7 +23,6 @@
 #define VIEW_WINDOW {{0, 0}, {256, 256}}
 
 
-bool show_updated_segments = false;
 unsigned char updated_segments_opacity = 255;
 bool print_fps = false;
 
@@ -154,13 +153,31 @@ public:
             //printing fps
             ImGui::Text("%f", p_avg_fps);
             //show updated segments
-            if(ImGui::Button("show update seg's")) {
-                grid.toggleDebug = !grid.toggleDebug;
+            if(ImGui::Button("show change")) {
+                grid.debug.isActive = !grid.debug.isActive;
             }
-            if(show_updated_segments) {
-                static float opacity = 1.f;
-                ImGui::SliderFloat("opacity", &opacity, 0.f, 1.f);
-                updated_segments_opacity = 255 * opacity;
+            if(grid.debug.isActive) {
+                if(ImGui::Button("show updates")) {
+                    grid.debug.showUpdated = !grid.debug.showUpdated;
+                }
+                if(grid.debug.showUpdated) {
+                    static float col[3] = {grid.debug.update_clr.r / 255.f, grid.debug.update_clr.g / 255.f, grid.debug.update_clr.b / 255.f};
+                    ImGui::ColorEdit3("change update color", col); 
+                    grid.debug.update_clr.r = col[0] * 255;
+                    grid.debug.update_clr.g = col[1] * 255;
+                    grid.debug.update_clr.b = col[2] * 255;
+                }
+                if(ImGui::Button("show draws")) {
+                    grid.debug.showDraws = !grid.debug.showDraws;
+                }
+                if(grid.debug.showDraws) {
+                    static float col[3] = {grid.debug.draw_clr.r / 255.f, grid.debug.draw_clr.g / 255.f, grid.debug.draw_clr.b / 255.f};
+                    ImGui::ColorEdit3("change draw color", col); 
+                    grid.debug.draw_clr.r = col[0] * 255;
+                    grid.debug.draw_clr.g = col[1] * 255;
+                    grid.debug.draw_clr.b = col[2] * 255;
+                }
+
             }
             //brush size
             ImGui::SliderInt("brush", &brush_size, 1, 32);
