@@ -8,7 +8,6 @@ enum class eKeyHookState {
     isReleased
 };
 class QuarryApp {
-    bool isActive = true;
 
     sf::Clock ImGuiClock;
 
@@ -22,6 +21,8 @@ class QuarryApp {
     window_t window;
 
 protected:
+    bool p_isActive = true;
+    bool p_isUpdating = true;
     float p_avg_fps = 60.f;
     vec2i p_grid_size;
     vec2f p_window_size;
@@ -31,7 +32,7 @@ protected:
         return sf::Mouse::getPosition(window);
     }
 
-    inline void exit() { isActive = false; }
+    inline void exit() { p_isActive = false; }
     inline void addKeyHook(sf::Keyboard::Key key, std::function<void(void)> func, eKeyHookState state = eKeyHookState::isPressed) {
         switch(state) {
             case eKeyHookState::isPressed :

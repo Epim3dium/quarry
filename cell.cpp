@@ -409,12 +409,12 @@ void CellVar::InitializeProperties() {
             };
             FOR_CELLS_AROUND_ME(checkWaterAroundMe);
             if(water_where.x != -1 && water_where.y != -1) {
-#if REACTION_LAVA_WATER
+#if bREACTION_LAVA_WATER_STEAM
                 grid.set(water_where, eCellType::Steam);
 #else
                 grid.set(water_where, eCellType::Air);
 #endif
-#if REACTION_LAVA_WATER_COBBLE
+#if bREACTION_LAVA_WATER_COBBLE
                 grid.set(v, eCellType::Cobblestone);
 #else
                 grid.set(water_where, eCellType::Air);
@@ -622,7 +622,7 @@ void CellVar::InitializeProperties() {
         //behaviour
         [](vec2i v, Grid& grid) {
             auto me = grid.get(v);
-            static const std::vector<clr_t> mid_colors = { clr_t(226, 88, 34), clr_t(128, 9, 9) };
+            const std::vector<clr_t> mid_colors = { clr_t(226, 88, 34), clr_t(128, 9, 9) };
 
             //spreading fire 
             {

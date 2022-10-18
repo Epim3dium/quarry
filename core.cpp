@@ -1,11 +1,14 @@
 #include <thread>
+#include <fstream>
 
 #include "core.h"
 #include "timer.h"
 #include "sprite.h"
 #include "opt.h"
 
-Grid::Grid(int w, int h) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_W * h / UPDATE_SEG_H), m_plane(w * h, CellVar(eCellType::Air)){
+Grid::Grid(int w, int h, const std::vector<CellVar>& vec) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_W * h / UPDATE_SEG_H), m_plane(vec){
+    if(vec.size() != w * h)
+        m_plane = std::vector<CellVar>(w * h, CellVar(eCellType::Air));
     if(CellVar::properties.size() != (int)eCellType::Bedrock + 1) {
         std::cerr << "Properties uninitialized";
         std::exit(0);
@@ -117,8 +120,10 @@ void Grid::m_analyzeRow(int id_y) {
 void Grid::updateCell(int x, int y) {
     if(get(x, y).type == eCellType::Air)
         return;
-    if(get(x, y).last_tick_updated >= tick_passed_total) 
+    if(get(x, y).last_tick_updated >= tick_passed_total) {
+        m_plane[m_idx(x, y)].last_tick_updated = tick_passed_total;
         return;
+    }
     if(get(x, y).move_count > MAX_MOVE_COUNT) {
         set(x, y, eCellType::Air);
         return;
@@ -173,8 +178,7 @@ void Grid::updateChangedSegments() {
 };
 void Grid::redrawChangedSegments() {
     for(auto& seg : m_SegmentsToRerender) {
-        if(seg.min.x != (int)0xffffff )
-            m_redrawSegment(seg);
+        m_redrawSegment(seg);
     }
     m_SegmentsToRerender.clear();
 }
@@ -264,4 +268,51 @@ vec2i Grid::convert_coords(vec2i mouse_pos, vec2f window_size) {
     pos_x += m_ViewWindow.min.x;
     pos_y += m_ViewWindow.min.y;
     return {pos_x, pos_y};
+}
+void Grid::mergeAt(const Grid& other, AABBi rect, vec2i fixed) {
+    if(rect.min.x == 0 && rect.max.x == -1) {
+        rect.min.x = 0;
+        rect.max.x = getWidth();
+
+        rect.min.y = 0;
+        rect.max.y = getHeight();
+    }
+    for(int y = rect.min.y; y < rect.max.y + other.getHeight(); y++) {
+        int y_rel = y - rect.min.y + fixed.y;
+        if(y_rel >= other.getHeight() || y_rel < 0)
+            continue;
+        for(int x = rect.min.x; x < rect.max.x + other.getWidth(); x++) {
+            int x_rel = x - rect.min.x + fixed.x;
+            if(x_rel >= other.getWidth() || x_rel < 0)
+                continue;
+            if(x >= 0 && x < getWidth() && x > rect.min.x && x < rect.max.x
+                && y >= 0 && y < getHeight() && y > rect.min.y && x < rect.max.y)
+                set(x, y, other.get(x - rect.min.x + fixed.x, y - rect.min.y + fixed.y));
+        }
+    }
+    m_updateSegment(rect.min, rect.max);
+}
+//file structure:
+//width height
+//      [row 0]: a b c d e ... width
+//      [row 1]: a b c d e ... width 
+// [row height]: a b c d e ... width
+void Grid::exportToFile(const char* filename) {
+    std::ofstream out(filename, std::ios::hex);
+    if(!out.good())
+        std::cerr << "error opening a file: " << filename << "\n";
+    out << m_width << " " << m_height;
+    out.write((char*)(void*)&m_plane[0], sizeof(CellVar) * m_width * m_height);
+}
+void Grid::importFromFile(const char* filename) {
+    int w, h;
+    std::ifstream in(filename, std::ios::hex);
+    if(!in.good())
+        std::cerr << "error opening a file: " << filename << "\n";
+
+    in >> w >> h;
+    std::vector<CellVar> vec(w*h, CellVar(eCellType::Air));
+    in.read((char*)(void*)&vec[0], sizeof(CellVar) * w * h);
+
+    *this = Grid(w, h, vec);
 }

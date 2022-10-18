@@ -23,7 +23,7 @@ void QuarryApp::run() {
     Grid grid(p_grid_size.x, p_grid_size.y);
     if(!setup(grid))
         return;
-    while (window.isOpen()) {
+    while (window.isOpen() && p_isActive) {
         sf::Event event;
         start = std::chrono::high_resolution_clock::now();
         p_window_size = window.getView().getSize();
@@ -45,12 +45,16 @@ void QuarryApp::run() {
             }
             ImGui::SFML::ProcessEvent(event);
         }
-        ImGui::SFML::Update(window, ImGuiClock.restart());
         //game loop
+
         grid.redrawChangedSegments();
+
+        ImGui::SFML::Update(window, ImGuiClock.restart());
         update(grid);
 
-        grid.updateChangedSegments();
+        if(p_isUpdating) {
+            grid.updateChangedSegments();
+        }
         grid.render(window);
 
         ImGui::SFML::Render(window);
@@ -66,7 +70,7 @@ void QuarryApp::run() {
     }
 }
 QuarryApp::QuarryApp(vec2i grid_size_, vec2f win_resolution) 
-    : window(sf::VideoMode(win_resolution.x, win_resolution.y), "automata"), p_grid_size(grid_size_), p_window_size(win_resolution)
+    : window(sf::VideoMode(win_resolution.x, win_resolution.y), "QuarryApp"), p_grid_size(grid_size_), p_window_size(win_resolution)
 { 
     CellVar::InitializeProperties();
     window.setFramerateLimit(60);

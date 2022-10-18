@@ -43,6 +43,8 @@ struct AABBi {
         max.x = std::max(max.x, v.x);
         max.y = std::max(max.y, v.y);
     }
+    AABBi() {}
+    AABBi(vec2i min_, vec2i max_) : min(min_), max(max_)  {}
 };
 bool AABBvAABB(const AABBi& r1, const AABBi& r2);
 bool VecvAABB(vec2i r1, const AABBi& r2);

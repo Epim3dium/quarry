@@ -18,32 +18,7 @@
 #define GWW 1024
 #define GWH 1024
 
-#define DEFAULT_BRUSH_SIZE (sqrt(GWW * GWH) / 32 / 2)
-
-#define VIEW_WINDOW {{0, 0}, {256, 256}}
-
-
-unsigned char updated_segments_opacity = 255;
-bool print_fps = false;
-
-#define CONSOLAS_PATH "assets/Consolas.ttf"
-
-void setupImGuiFont() {
-    sf::Font consolas;
-    if (!consolas.loadFromFile(CONSOLAS_PATH)) {
-        std::cout << "error while lodaing font file!";
-        exit(1);
-    }
-
-    //for bigger font
-    ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->Clear();
-    io.WantCaptureMouse = true;
-    io.WantCaptureMouseUnlessPopupClose = true;
-    
-    ImFont* font = io.Fonts->AddFontFromFileTTF(CONSOLAS_PATH, 24.f);
-    ImGui::SFML::UpdateFontTexture();
-}
+#define VIEW_WINDOW AABBi{{-1, -1}, {256, 256}}
 
 class Ball {
     const static QuarrySprite g_sprite;
@@ -87,7 +62,7 @@ class Demo : public QuarryApp {
 public:
     Ball ball = Ball(vec2f(50, 50));
 
-    int brush_size = DEFAULT_BRUSH_SIZE;
+    int brush_size;
     bool on_brush_click = false;
     eCellType brush_material = eCellType::Sand;
     vec2i last_mouse_pos = {-1, -1};
@@ -115,6 +90,7 @@ public:
         }
     };
     void update(Grid& grid) override {
+
         if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !on_brush_click) {
             spawnAtBrush(grid);
         }
@@ -143,12 +119,16 @@ public:
         ball.rb.vel.y -= 0.07f;
         ball.update(grid);
         ball.draw(grid);
-        //ball.draw(grid);
         {
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(ImGuiWindowSize.x, ImGuiWindowSize.y), ImGuiCond_FirstUseEver);
 
             ImGui::Begin("Demo window", nullptr, p_imgui_flags);
+
+            //printing material under cursor
+            vec2i mouse_pos = getMousePos();
+            vec2i grid_mouse_coords = grid.convert_coords(mouse_pos, p_window_size); 
+            ImGui::Text("%s", to_str(grid.get(grid_mouse_coords).type) + sizeof("eCellType:"));
 
             //printing fps
             ImGui::Text("%f", p_avg_fps);
@@ -177,7 +157,16 @@ public:
                     grid.debug.draw_clr.g = col[1] * 255;
                     grid.debug.draw_clr.b = col[2] * 255;
                 }
-
+            }
+            static std::string filename = "test";
+            ImGui::InputText("filename", &filename[0], filename.capacity());
+            if(ImGui::Button("export")) {
+                grid.exportToFile(filename.c_str());
+            }
+            if(ImGui::Button("import")) {
+                auto tmp_grid = Grid(1, 1);
+                tmp_grid.importFromFile(filename.c_str());
+                grid.mergeAt(tmp_grid);
             }
             //brush size
             ImGui::SliderInt("brush", &brush_size, 1, 32);
@@ -187,8 +176,10 @@ public:
                 for(auto i = eCellType::Air; i < eCellType::Bedrock; i = (eCellType)((int)i + 1))
                     all_materials.push_back(i);
                 std::vector<const char*> all_materials_str;
-                for(auto i : all_materials)
-                    all_materials_str.push_back(to_str(i));
+                for(auto i : all_materials) {
+                    //ohh so haacky
+                    all_materials_str.push_back(to_str(i) + sizeof("eCellType:"));
+                }
 
                 static int item_current = 0;
                 ImGui::ListBox("mat", &item_current, &all_materials_str[0], all_materials_str.size(), 16);
@@ -205,6 +196,7 @@ public:
     }
     bool setup(Grid& grid) override {
         grid.setViewWindow(VIEW_WINDOW);
+        brush_size = (sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2);
         addKeyHook(sf::Keyboard::Q, 
             [&]() {
                 auto t = brush_size;
@@ -222,20 +214,25 @@ public:
         addKeyHook(sf::Keyboard::R, 
             [&]() {
                 grid = Grid(GWW, GWH);
-                brush_size = DEFAULT_BRUSH_SIZE;
+                brush_size = (sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2);
             });
         addKeyHook(sf::Keyboard::V, 
             [&]() {
                 grid.setViewWindow(grid.getDefaultViewWindow());
+                brush_size = (sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2);
             });
         addKeyHook(sf::Keyboard::Space, 
+            [&]() {
+                p_isUpdating = !p_isUpdating;
+            });
+        addKeyHook(sf::Keyboard::Z, 
             [&]() {
                 if(last_mouse_pos.x == -1) {
                     last_mouse_pos = getMousePos();
                     last_mouse_pos = grid.convert_coords(last_mouse_pos, p_window_size);
                 }
             }, eKeyHookState::isPressed);
-        addKeyHook(sf::Keyboard::Space, 
+        addKeyHook(sf::Keyboard::Z, 
             [&]() {
                 AABBi new_view;
 
@@ -250,7 +247,10 @@ public:
                 new_view.max.x = new_view.min.x + max_size;
                 new_view.max.y = new_view.min.y + max_size;
 
+                new_view.min -= vec2i(1, 1);
+
                 grid.setViewWindow(new_view);
+                brush_size = (sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2);
                 last_mouse_pos.x = -1;
             }, eKeyHookState::isReleased);
 

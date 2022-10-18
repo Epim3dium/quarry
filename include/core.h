@@ -30,7 +30,7 @@ private:
     //returned when geet is out of bounds
     CellVar null_obj = CellVar(eCellType::Bedrock);
 
-    inline size_t m_idx(int x, int y) {
+    inline size_t m_idx(int x, int y) const {
         return x + y * m_width;
     }
     void updateCell(int x, int y);
@@ -53,6 +53,10 @@ public:
         clr_t update_clr = clr_t::Red;
         clr_t draw_clr = clr_t::Green;
     }debug;
+    inline size_t getWidth() const { return m_width; }
+    inline size_t getHeight() const { return m_height; }
+    inline vec2u getSize() const { return vec2u(m_width, m_height); }
+
     AABBi getViewWindow() const {
         return m_ViewWindow;
     }
@@ -62,14 +66,15 @@ public:
         sf::Image t(m_Buffer);
         m_Buffer.create(aabb.size().x, aabb.size().y, CellVar::properties[eCellType::Air].colors.front());
 
+        m_updateSegment(aabb.min, aabb.max);
         m_redrawSegment(aabb);
     }
 
     size_t time_step = 1;
-    inline bool inBounds(int x, int y) {
+    inline bool inBounds(int x, int y) const {
         return x >= 0 && y >= 0 && x < m_width && y < m_height;
     }
-    inline bool inBounds(vec2i v) { return inBounds(v.x, v.y); }
+    inline bool inBounds(vec2i v) const { return inBounds(v.x, v.y); }
     inline bool inView(int x, int y) { 
         return 
             x >= m_ViewWindow.min.x  && x < m_ViewWindow.max.x &&
@@ -80,12 +85,12 @@ public:
     }
 
 
-    inline const CellVar& get(int x, int y) {
+    inline const CellVar& get(int x, int y) const {
         if(!inBounds(x, y))
             return null_obj;
         return m_plane[m_idx(x, y)];
     }
-    inline const CellVar& get(vec2i v) {
+    inline const CellVar& get(vec2i v) const {
         return get(v.x, v.y);
     }
     void set(int x, int y, const CellVar& cv);
@@ -110,14 +115,12 @@ public:
     void redrawChangedSegments();
     void render(window_t& rw);
 
-    inline void update() {
-        auto t = getDefaultViewWindow();
-        for(int i = 0; i < time_step; i++){
-            tick_passed_total++;
-            m_updateSegment(t.min, t.max);
-        }
-    }
+    //rect in which other should be fitted(fixed point will be the coordinate of bl_corner in rect)
+    void mergeAt(const Grid& other, AABBi rect = AABBi(vec2i(0, 0), vec2i(-1, -1)), vec2i fixed = vec2i(0, 0));
 
-    Grid(int w, int h);
+    void exportToFile(const char* filename);
+    void importFromFile(const char* filename);
+
+    Grid(int w, int h, const std::vector<CellVar>& vec = std::vector<CellVar>());
     friend QuarrySprite;
 };
