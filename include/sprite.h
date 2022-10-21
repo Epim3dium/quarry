@@ -13,6 +13,10 @@ class QuarrySprite {
 
     void m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid);
 public:
+    struct {
+        bool x = false;
+        bool y = false;
+    }flip;
     inline clr_t* getPixels() {
         if(buffer.size() != 0)
             return &buffer[0];

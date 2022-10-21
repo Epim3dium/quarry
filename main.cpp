@@ -11,33 +11,33 @@
 #include "sprite.h"
 #include "rigidbody.h"
 #include "quarry.h"
+#include "entity.h"
 
-#define WW 2048.f
+#define GWH 512
+#define GWW 512
+
 #define WH 2048.f
+#define WW (WH * GWH/GWW)
 
-#define GWW 1024
-#define GWH 1024
 
-#define VIEW_WINDOW AABBi{{-1, -1}, {256, 256}}
+const static QuarrySprite g_player_sprite("./assets/player.png");
+const static QuarrySprite g_camera_sprite("./assets/camera.png");
 
-class Ball {
-    const static QuarrySprite g_sprite;
+#define ENTITY_PLAYER_TYPE 0
+
+class Player : public Entity {
 public:
-    QuarrySprite spr;
-    CircleRigidbody rb;
     //in degrees
     float grounded_check_angle = 35.f;
     size_t grounded_check_count = 5;
 
-    vec2f pos;
     bool isGrounded = true;
     bool isSemiGrounded = true;
 
-    void draw(Grid& g) {
-        spr.drawAt((vec2i)pos, g);
+    void onHitEntity() override {
+        isSemiGrounded = true;
     }
-    void update(Grid& g) {
-        rb.update(g, pos);
+    void update(Grid& g) override {
         isGrounded = false;
         isSemiGrounded = false;
         for(float a = -grounded_check_angle / 2.f; a < grounded_check_angle; a += grounded_check_angle / grounded_check_count) {
@@ -50,22 +50,31 @@ public:
             isSemiGrounded = true;
     }
 
-    Ball() : spr(g_sprite) {}
-    Ball(vec2f p) : pos(p), spr(g_sprite) {
-        rb.radius = roundf(spr.getHeight() / 2.f);
+    Player(vec2f p) : Entity(p, g_player_sprite) {
         rb.physics.density = 900;
+        this->type = ENTITY_PLAYER_TYPE;
     }
 };
-const QuarrySprite Ball::g_sprite("./assets/player.png");
+#define ENTITY_PICKUP_TYPE 1
+class PickupObject : public Entity {
+public:
+
+    PickupObject(vec2f p, const QuarrySprite& spr) : Entity(p, spr) {
+        this->type = ENTITY_PICKUP_TYPE;
+    }
+};
 
 class Demo : public QuarryApp {
 public:
-    Ball ball = Ball(vec2f(50, 50));
+    std::vector<std::unique_ptr<Entity> > entities;
+    Player* player;
+    PickupObject* camera;
 
     int brush_size;
     bool on_brush_click = false;
     eCellType brush_material = eCellType::Sand;
     vec2i last_mouse_pos = {-1, -1};
+    vec2i grid_mouse_coords;
 
     vec2f ImGuiWindowSize = vec2f(WW/5, WH / 2);
 
@@ -73,13 +82,14 @@ public:
 
     void spawnAtBrush(Grid& grid, bool ifEmpty = false, const CellVar* cv = nullptr ) {
         vec2i mouse_pos = getMousePos();
-        if(mouse_pos.x < ImGuiWindowSize.x && mouse_pos.y < ImGuiWindowSize.y)
-            return;
         auto grid_mouse_coords = grid.convert_coords(mouse_pos, p_window_size); 
         for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
             for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++) {
                 if(grid.inBounds(grid_mouse_coords + vec2i(x, y)) && (grid.get(grid_mouse_coords + vec2i(x, y)).type == eCellType::Air || !ifEmpty)){
-                    grid.set(grid_mouse_coords + vec2i(x, y), CellVar(brush_material));
+                    if(cv) 
+                        grid.set(grid_mouse_coords + vec2i(x, y), *cv);
+                    else
+                        grid.set(grid_mouse_coords + vec2i(x, y), CellVar(brush_material));
                 }
             }
     }
@@ -94,7 +104,10 @@ public:
         if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !on_brush_click) {
             spawnAtBrush(grid);
         }
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::P)) {
+        }
         spawnMaterial(grid, sf::Keyboard::A, eCellType::Acid);
+        spawnMaterial(grid, sf::Keyboard::E, eCellType::Leaf);
         spawnMaterial(grid, sf::Keyboard::O, eCellType::Wood);
         spawnMaterial(grid, sf::Keyboard::D, eCellType::Dirt);
         spawnMaterial(grid, sf::Keyboard::S, eCellType::Sand);
@@ -103,6 +116,7 @@ public:
         spawnMaterial(grid, sf::Keyboard::X, eCellType::Stone);
         spawnMaterial(grid, sf::Keyboard::C, eCellType::Crystal);
         spawnMaterial(grid, sf::Keyboard::F, eCellType::Fire);
+
         player_input = {0, 0};
         float player_speed = 0.05f;
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
@@ -114,20 +128,31 @@ public:
         if(sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
             player_input.x = 1;
         if(player_input.x != 0 || player_input.y != 0)
-            ball.rb.vel.x += (float)player_input.x * player_speed;
+            player->rb.vel.x += (float)player_input.x * player_speed;
 
-        ball.rb.vel.y -= 0.07f;
-        ball.update(grid);
-        ball.draw(grid);
+        vec2i mouse_pos = getMousePos();
+        grid_mouse_coords = grid.convert_coords(mouse_pos, p_window_size); 
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
+        }
+
+        for(auto& e : entities) {
+            e->rb.vel.y -= 0.07f;
+            e->update(grid);
+            e->rb.update(grid, e->pos);
+            e->draw(grid);
+            for(auto& ee : entities) {
+                if(e != ee)
+                    e->processEntityCollisions(ee.get());
+            }
+        }
         {
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(ImGuiWindowSize.x, ImGuiWindowSize.y), ImGuiCond_FirstUseEver);
 
-            ImGui::Begin("Demo window", nullptr, p_imgui_flags);
+            ImGui::Begin("Demo window", nullptr);
 
             //printing material under cursor
-            vec2i mouse_pos = getMousePos();
-            vec2i grid_mouse_coords = grid.convert_coords(mouse_pos, p_window_size); 
             ImGui::Text("%s", to_str(grid.get(grid_mouse_coords).type) + sizeof("eCellType:"));
 
             //printing fps
@@ -158,12 +183,14 @@ public:
                     grid.debug.draw_clr.b = col[2] * 255;
                 }
             }
-            static std::string filename = "test";
-            ImGui::InputText("filename", &filename[0], filename.capacity());
+            static std::string filename = "test.bin";
+            ImGui::Text("filename: \"%s\"", filename.c_str());
             if(ImGui::Button("export")) {
+                std::cin >> filename;
                 grid.exportToFile(filename.c_str());
             }
             if(ImGui::Button("import")) {
+                std::cin >> filename;
                 auto tmp_grid = Grid(1, 1);
                 tmp_grid.importFromFile(filename.c_str());
                 grid.mergeAt(tmp_grid);
@@ -173,7 +200,7 @@ public:
             //material selection
             {
                 std::vector<eCellType> all_materials;
-                for(auto i = eCellType::Air; i < eCellType::Bedrock; i = (eCellType)((int)i + 1))
+                for(auto i = eCellType::Air; i <= eCellType::Bedrock; i = (eCellType)((int)i + 1))
                     all_materials.push_back(i);
                 std::vector<const char*> all_materials_str;
                 for(auto i : all_materials) {
@@ -182,7 +209,7 @@ public:
                 }
 
                 static int item_current = 0;
-                ImGui::ListBox("mat", &item_current, &all_materials_str[0], all_materials_str.size(), 16);
+                ImGui::ListBox("mat", &item_current, &all_materials_str[0], all_materials_str.size(), 17);
                 brush_material = all_materials[item_current];
 
                 on_brush_click = false;
@@ -195,8 +222,35 @@ public:
         }
     }
     bool setup(Grid& grid) override {
-        grid.setViewWindow(VIEW_WINDOW);
-        brush_size = (sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2);
+        brush_size = std::clamp<int>(sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2, 1, 0xffffff);
+        CellVar::addReplicatorMap("tree.bin", 0);
+        CellVar::addReplicatorMap("house.bin", 1);
+        CellVar::addReplicatorMap("horse.bin", 2);
+        CellVar::addReplicatorMap("island.bin", 3);
+
+        player = new Player(vec2f(50, 50));
+        entities.push_back(std::unique_ptr<Entity>(player));
+        camera = new PickupObject(vec2f(100, 50), g_camera_sprite);
+        entities.push_back(std::unique_ptr<Entity>(camera));
+
+#define SPAWN_REPLICATOR(cid, cx, cy)\
+            auto t = brush_size;\
+\
+            CellVar cv(eCellType::Replicator);\
+            cv.var.Replicator.id = cid;\
+            cv.var.Replicator.x= cx;\
+            cv.var.Replicator.y= cy;\
+\
+            brush_size = 1;\
+            spawnAtBrush(grid, false, &cv);\
+\
+            brush_size = t
+
+        addKeyHook(sf::Keyboard::LShift, 
+            [&]() {
+                camera = new PickupObject(vec2f(grid_mouse_coords), g_camera_sprite);
+                entities.push_back(std::unique_ptr<Entity>(camera));
+            });
         addKeyHook(sf::Keyboard::Q, 
             [&]() {
                 auto t = brush_size;
@@ -204,22 +258,36 @@ public:
                 spawnMaterial(grid, sf::Keyboard::Q, eCellType::Seed);
                 brush_size = t;
             });
+        addKeyHook(sf::Keyboard::Num0, 
+            [&]() {
+                SPAWN_REPLICATOR(0, 0, 0);
+            });
+        addKeyHook(sf::Keyboard::Num1, 
+            [&]() {
+                SPAWN_REPLICATOR(1, 0, 0);
+            });
+        addKeyHook(sf::Keyboard::Num2, 
+            [&]() {
+                SPAWN_REPLICATOR(2, 0, 0);
+            });
+        addKeyHook(sf::Keyboard::Num3, 
+            [&]() {
+                SPAWN_REPLICATOR(3, 0, 0);
+            });
         addKeyHook(sf::Keyboard::Up, 
             [&]() {
-                if(ball.isGrounded)
-                    ball.rb.vel.y = 3.f;
-                if(ball.isSemiGrounded)
-                    ball.rb.vel.y += 1.f;
+                if(player->isGrounded)
+                    player->rb.vel.y = 3.f;
+                if(player->isSemiGrounded)
+                    player->rb.vel.y += 1.f;
             });
         addKeyHook(sf::Keyboard::R, 
             [&]() {
                 grid = Grid(GWW, GWH);
-                brush_size = (sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2);
             });
         addKeyHook(sf::Keyboard::V, 
             [&]() {
                 grid.setViewWindow(grid.getDefaultViewWindow());
-                brush_size = (sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2);
             });
         addKeyHook(sf::Keyboard::Space, 
             [&]() {
@@ -250,7 +318,6 @@ public:
                 new_view.min -= vec2i(1, 1);
 
                 grid.setViewWindow(new_view);
-                brush_size = (sqrt(grid.getViewWindow().size().x * grid.getViewWindow().size().y) / 32 / 2);
                 last_mouse_pos.x = -1;
             }, eKeyHookState::isReleased);
 
@@ -261,19 +328,6 @@ public:
 };
 int main()
 {
-    /*
-            //else if(event.type == sf::Event::MouseButtonPressed) {
-            //    if(on_brush_click)
-            //        spawnAtBrush();
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !on_brush_click) {
-            spawnAtBrush();
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::C)) {
-            CellVar cv(eCellType::CrumblingStone);
-            cv.var.CrumblingStone.lvl = 1;
-            spawnAtBrush(false, &cv);
-        }
-        */
     Demo app;
     app.run();
     return 0;

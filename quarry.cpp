@@ -60,12 +60,17 @@ void QuarryApp::run() {
         ImGui::SFML::Render(window);
         {
             auto end = std::chrono::high_resolution_clock::now();
+             
             float fps = (float)1e9/(float)std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+
             if(fps_array.size() >= 64)
                 fps_array.erase(fps_array.begin());
             fps_array.push_back(fps);
             p_avg_fps = (float)std::accumulate(fps_array.begin(), fps_array.end(), 0) / fps_array.size();
         }
+        auto end = std::chrono::high_resolution_clock::now();
+        p_deltaTime = std::chrono::duration_cast<std::chrono::seconds>(end-start).count();
+
         window.display();
     }
 }
@@ -74,11 +79,6 @@ QuarryApp::QuarryApp(vec2i grid_size_, vec2f win_resolution)
 { 
     CellVar::InitializeProperties();
     window.setFramerateLimit(60);
-
-    p_imgui_flags = 0;
-    p_imgui_flags |= ImGuiWindowFlags_NoMove;
-    p_imgui_flags |= ImGuiWindowFlags_NoResize;
-    p_imgui_flags |= ImGuiWindowFlags_NoCollapse;
 
     ImGui::SFML::Init(window);
     setupImGuiFont();

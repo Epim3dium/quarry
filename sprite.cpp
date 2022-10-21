@@ -10,12 +10,28 @@ void QuarrySprite::m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid) {
 
     pos -= {w/2, h/2};
 
-    for(int y = 0; y < h; y++) {
-        for(int x = 0; x < w; x++) {
-            if(buf[x + y * w].a != 0.f && VecvAABB(vec2i(pos.x + x, pos.y + y), grid.getViewWindow()))
-                grid.drawCellAt(pos.x + x, pos.y + y, buf[x + y * w]);
+    int gy = 0;
+    int y = 0;
+    if(flip.y)
+        y = h - 1;
 
+    while(y >= 0 && y < h) {
+        int x = 0;
+        int gx = 0;
+        if(!flip.x)
+            x = w - 1;
+        while(x >= 0 && x < w) {
+            if(buf[x + y * w].a != 0.f && VecvAABB(vec2i(pos.x + gx, pos.y + gy), grid.getViewWindow()))
+                grid.drawCellAt(pos.x + gx, pos.y + gy, buf[x + y * w]);
+            x++;
+            gx++;
+            if(!flip.x)
+                x -= 2;
         }
+        y++;
+        gy++;
+        if(flip.y)
+            y -= 2;
     }
 }
 void QuarrySprite::drawAt(vec2i pos, Grid& grid) {

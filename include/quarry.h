@@ -23,10 +23,12 @@ class QuarryApp {
 protected:
     bool p_isActive = true;
     bool p_isUpdating = true;
+
     float p_avg_fps = 60.f;
+    float p_deltaTime = 0.f;
+
     vec2i p_grid_size;
     vec2f p_window_size;
-    ImGuiWindowFlags p_imgui_flags = 0;
 
     inline vec2i getMousePos() {
         return sf::Mouse::getPosition(window);

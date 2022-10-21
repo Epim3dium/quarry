@@ -5,6 +5,7 @@
 #include <functional>
 
 class Grid;
+class Map;
 
 enum class eCellType : unsigned char {
     //gases
@@ -27,6 +28,7 @@ enum class eCellType : unsigned char {
     Stone,
     //special
     //tree & vegetation
+    Replicator,
     Grass,
     Seed,
     Wood,
@@ -72,6 +74,8 @@ private:
     unsigned int last_tick_updated;
 
 
+    //maps can be of max size 
+    static std::map<unsigned char, Map> replicator_maps;
 public:
     static std::map<eCellType, CellConstants> properties;
     unsigned long getID() const {return id;}
@@ -84,7 +88,16 @@ public:
     unsigned short move_count = 0;
     unsigned short age = 0;
 
+    static void addReplicatorMap(const char* filename, unsigned char id);
     union VarUnion {
+        //max size of short, filename to bin file and id to override/add new map
+        struct {
+            //cooridnates in respect to the center
+            short x;
+            short y;
+            //id of map trying to replicate
+            unsigned char id;
+        }Replicator;
         struct {
             bool isSource;
         }Fire;
@@ -134,5 +147,6 @@ public:
         color = all_colors[ g_rng.Random<size_t>(0U, all_colors.size()) ];
     }
     friend Grid;
+    friend VarUnion;
     static void InitializeProperties();
 };

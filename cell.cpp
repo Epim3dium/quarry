@@ -9,6 +9,7 @@
 //dirt + lava = Cobblestone
 //acid
 
+std::map<unsigned char, Map> CellVar::replicator_maps = {};
 std::map<eCellType, CellConstants> CellVar::properties = {};
 
 #define FOR_CELLS_AROUND_ME(func)\
@@ -41,6 +42,7 @@ const char* to_str(eCellType type) {
         CASE_RETURN(eCellType::Wood);
         CASE_RETURN(eCellType::Leaf);
         CASE_RETURN(eCellType::Fire);
+        CASE_RETURN(eCellType::Replicator);
         CASE_RETURN(eCellType::Bedrock);
         default:
             return "not named";
@@ -116,6 +118,9 @@ static bool checkSpreadFire(Grid& grid, const vec2i& v, const vec2i& other) {
     }
     return false;
 };
+void CellVar::addReplicatorMap(const char* filename, unsigned char id) {
+    replicator_maps[id] = Grid::importData(filename);
+}
 
 void CellVar::InitializeProperties() {
     //Empty space
@@ -676,6 +681,47 @@ void CellVar::InitializeProperties() {
         {clr_t(253,207,88)}
     );
 
+    CellVar::properties[eCellType::Replicator] = CellConstants(
+        //powdery
+        eState::Soild,
+        //density
+        0xffffff,
+        //flammability
+        0.f,
+        //behaviour
+        [](vec2i v, Grid& grid) {
+            const auto isReplacable = [&](vec2i coord) {
+                return grid.get(coord).getProperty().state == eState::Gas;
+            };
+
+            auto me = grid.get(v);
+            const auto& my_map = CellVar::replicator_maps[me.var.Replicator.id];
+            vec2i coord = vec2i(my_map.w, my_map.h) / 2;
+            const static auto dirs = {vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1)};
+            for(auto& d : dirs) {
+                vec2i get_coord = vec2i(coord.x + me.var.Replicator.x + d.x, coord.y + me.var.Replicator.y + d.y); 
+                if(isReplacable(v + d) && my_map.data[get_coord.x + get_coord.y * my_map.w].type != eCellType::Air 
+                    && get_coord.x >= 0 && get_coord.y >= 0 && get_coord.x < my_map.w && get_coord.y < my_map.h) 
+                {
+                    auto t = me;
+                    t.var.Replicator.x += d.x;
+                    t.var.Replicator.y += d.y;
+                    grid.set(v + d, t);
+                }
+            }
+            vec2i get_coord = vec2i(coord.x + me.var.Replicator.x, coord.y + me.var.Replicator.y); 
+            if(get_coord.x >= 0 && get_coord.y >= 0 && get_coord.x < my_map.w && get_coord.y < my_map.h && my_map.data[get_coord.x + get_coord.y * my_map.w].type != eCellType::Air)  
+            {
+                grid.set(v, my_map.data[get_coord.x + get_coord.y * my_map.w]);
+            }else {
+                grid.set(v, eCellType::Air);
+            }
+
+            return;
+        },
+        //colors
+        {clr_t(255, 0, 255)}
+    );
     CellVar::properties[eCellType::Bedrock] = CellConstants(
         //powdery
         eState::Soild,

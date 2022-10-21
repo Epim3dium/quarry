@@ -17,4 +17,5 @@ public:
     vec2f vel = {0, 0};
 
     void update(Grid& g, vec2f& pos);
+    bool processRigidbodyCol(CircleRigidbody& rb, vec2f& m_pos, vec2f& o_pos);
 };

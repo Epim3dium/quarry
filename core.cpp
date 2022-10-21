@@ -74,7 +74,9 @@ void Grid::m_analyzeRow(int id_y) {
     int id_x = 0;
     bool last_updated = false;
     AABBi cur_aabb = {{0xffffff, 0xffffff}, {}};
+    bool was_last = false;
     while(id_x < m_width / UPDATE_SEG_W) {
+        was_last = false;
         //m_updateSection(id_x + id_y * m_width / UPDATE_SEG_W);
         do {
             size_t index = id_x + id_y * m_width / UPDATE_SEG_W;
@@ -109,6 +111,7 @@ void Grid::m_analyzeRow(int id_y) {
                     cur_aabb.max = seg.max;
                     last_updated = true;
                 }
+                was_last = true;
                 m_SegmentsToRerender.push_back(seg);
                 //m_updateSegment(seg.min, seg.max);
             }
@@ -116,6 +119,8 @@ void Grid::m_analyzeRow(int id_y) {
         //
         id_x++;
     }
+    if(was_last)
+        m_updateSegment(cur_aabb.min, cur_aabb.max);
 }
 void Grid::updateCell(int x, int y) {
     if(get(x, y).type == eCellType::Air)
@@ -285,8 +290,8 @@ void Grid::mergeAt(const Grid& other, AABBi rect, vec2i fixed) {
             int x_rel = x - rect.min.x + fixed.x;
             if(x_rel >= other.getWidth() || x_rel < 0)
                 continue;
-            if(x >= 0 && x < getWidth() && x > rect.min.x && x < rect.max.x
-                && y >= 0 && y < getHeight() && y > rect.min.y && x < rect.max.y)
+            if(x >= 0 && x < getWidth() && x >= rect.min.x && x <= rect.max.x
+                && y >= 0 && y < getHeight() && y >= rect.min.y && x <= rect.max.y)
                 set(x, y, other.get(x - rect.min.x + fixed.x, y - rect.min.y + fixed.y));
         }
     }
@@ -298,21 +303,28 @@ void Grid::mergeAt(const Grid& other, AABBi rect, vec2i fixed) {
 //      [row 1]: a b c d e ... width 
 // [row height]: a b c d e ... width
 void Grid::exportToFile(const char* filename) {
-    std::ofstream out(filename, std::ios::hex);
+    std::string full_path = (std::string)IMPORT_EXPORT_MAP_DIR + filename;
+    std::ofstream out(full_path, std::ios::hex | std::ios::out | std::ios::app);
     if(!out.good())
         std::cerr << "error opening a file: " << filename << "\n";
-    out << m_width << " " << m_height;
+    out << m_width << " " << m_height << ";";
     out.write((char*)(void*)&m_plane[0], sizeof(CellVar) * m_width * m_height);
 }
-void Grid::importFromFile(const char* filename) {
-    int w, h;
-    std::ifstream in(filename, std::ios::hex);
+Map Grid::importData(const char* filename) {
+    Map m;
+    std::string full_path = (std::string)IMPORT_EXPORT_MAP_DIR + filename;
+    std::ifstream in(full_path, std::ios::hex);
     if(!in.good())
         std::cerr << "error opening a file: " << filename << "\n";
 
-    in >> w >> h;
-    std::vector<CellVar> vec(w*h, CellVar(eCellType::Air));
-    in.read((char*)(void*)&vec[0], sizeof(CellVar) * w * h);
+    char end;
+    in >> m.w >> m.h >> end;
+    m.data = std::vector<CellVar>(m.w*m.h, CellVar(eCellType::Air));
+    in.read((char*)(void*)&m.data[0], sizeof(CellVar) * m.w * m.h);
 
-    *this = Grid(w, h, vec);
+    return m;
+}
+void Grid::importFromFile(const char* filename) {
+    auto m = importData(filename);
+    *this = Grid(m.w, m.h, m.data);
 }

@@ -1,6 +1,25 @@
 #include "include/rigidbody.h"
 #include "include/core.h"
 
+bool CircleRigidbody::processRigidbodyCol(CircleRigidbody& other, vec2f& pos, vec2f& other_p) {
+    if(length(other_p - pos) < radius + other.radius) {
+        vec2f n = -normal(other_p - pos);
+        float f = 1.f / length(other_p - pos);
+        if(length(n) != 0.f) {
+            float d = std::clamp(dot(vel, n), -INFINITY, 0.f);
+
+            //add bounce
+            vel.x -= (1.f + physics.bounciness + f) * (n.x * d); 
+            vel.y -= (1.f + physics.bounciness + f) * (n.y * d);
+
+            other.vel.x += (1.f + other.physics.bounciness + f) * (n.x * d); 
+            other.vel.y += (1.f + other.physics.bounciness + f) * (n.y * d);
+        }
+        return true;
+    }
+    return false;
+
+}
 void CircleRigidbody::update(Grid& g, vec2f& pos) {
     auto isCollidable = [&](const CellVar& cv) {
         return cv.getProperty().density > 1000;

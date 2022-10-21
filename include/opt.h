@@ -3,6 +3,9 @@
 #define THREADED_UPDATE false 
 #define MAX_MOVE_COUNT 2048U
 
+#define IMPORT_EXPORT_MAP_DIR "assets/"
+
+
 #define UPDATE_SEG_W 16
 #define UPDATE_SEG_H 16
 

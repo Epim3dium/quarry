@@ -12,6 +12,12 @@ struct SegInfo {
     bool toUpdate = false;
     bool toUpdateNextFrame = false;
 };
+struct Map {
+    size_t w;
+    size_t h;
+
+    std::vector<CellVar> data;
+};
 class Grid {
 private:
     size_t m_width;
@@ -120,6 +126,7 @@ public:
 
     void exportToFile(const char* filename);
     void importFromFile(const char* filename);
+    static Map importData(const char* filename);
 
     Grid(int w, int h, const std::vector<CellVar>& vec = std::vector<CellVar>());
     friend QuarrySprite;
