@@ -9,6 +9,7 @@
 #include "core.h"
 #include "timer.h"
 #include "sprite.h"
+#include "render_shape.h"
 #include "rigidbody.h"
 #include "quarry.h"
 #include "entity.h"
@@ -23,7 +24,7 @@
 const static QuarrySprite g_player_sprite("./assets/player.png");
 const static QuarrySprite g_camera_sprite("./assets/camera.png");
 
-#define ENTITY_PLAYER_TYPE 0
+#define ENTITY_PLAYER_TYPE 69
 
 class Player : public Entity {
 public:
@@ -34,10 +35,42 @@ public:
     bool isGrounded = true;
     bool isSemiGrounded = true;
 
-    void onHitEntity() override {
+    void onHitEntity(Entity* e) override {
         isSemiGrounded = true;
     }
     void update(Grid& g) override {
+        vec2i player_input = {0, 0};
+        float player_speed = 0.05f;
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::W))
+            player_input.y = 1;
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+            player_input.y = -1;
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+            player_input.x = -1;
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+            player_input.x = 1;
+        if(player_input.x != 0 || player_input.y != 0)
+            rb.vel.x += (float)player_input.x * player_speed;
+
+        //for throwing
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::H)) {
+            auto o = GetVar<void*>("obj_held");
+            if(o.has_value() && o.value() != nullptr) {
+                Entity* e = (Entity*)o.value();
+                e->rb.isActive = true;
+                e->rb.vel = this->rb.vel * 2.f;
+                if(e->rb.vel.y < 0) {
+                    e->rb.vel.y = 1.f;
+
+                }
+                //to avoid instant pickup
+                e->pos += e->rb.vel;
+
+                e->SetVar("parent", nullptr);
+                SetVar("obj_held", nullptr);
+            }
+        }
+
         isGrounded = false;
         isSemiGrounded = false;
         for(float a = -grounded_check_angle / 2.f; a < grounded_check_angle; a += grounded_check_angle / grounded_check_count) {
@@ -52,15 +85,35 @@ public:
 
     Player(vec2f p) : Entity(p, g_player_sprite) {
         rb.physics.density = 900;
-        this->type = ENTITY_PLAYER_TYPE;
+        rb.physics.friction *= 0.5f;
+        type = ENTITY_PLAYER_TYPE;
+        SetVar("obj_held", (void*)nullptr);
     }
 };
 #define ENTITY_PICKUP_TYPE 1
 class PickupObject : public Entity {
 public:
+    void onHitEntity(Entity* e) override {
+        if(e->type == ENTITY_PLAYER_TYPE) {
+            auto v = e->GetVar<void*>("obj_held");
+            if(v.value() == nullptr) {
+                e->SetVar("obj_held", this);
+                this->rb.isActive = false;
+                SetVar("parent", e);
+            }
+        }
+    }
+    void update(Grid& g) override {
+        Entity* e = (Entity*)GetVar<void*>("parent").value();
+        if(e) {
+            this->pos = e->pos + vec2f(0, e->rb.radius * 1 + this->rb.radius);
+        }
+    }
 
     PickupObject(vec2f p, const QuarrySprite& spr) : Entity(p, spr) {
         this->type = ENTITY_PICKUP_TYPE;
+        SetVar("parent", nullptr);
+        this->rb.physics.drag *= 0.3f;
     }
 };
 
@@ -104,36 +157,43 @@ public:
         if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !on_brush_click) {
             spawnAtBrush(grid);
         }
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::P)) {
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
+            spawnMaterial(grid, sf::Keyboard::A, eCellType::Acid);
+            spawnMaterial(grid, sf::Keyboard::E, eCellType::Leaf);
+            spawnMaterial(grid, sf::Keyboard::O, eCellType::Wood);
+            spawnMaterial(grid, sf::Keyboard::D, eCellType::Dirt);
+            spawnMaterial(grid, sf::Keyboard::S, eCellType::Sand);
+            spawnMaterial(grid, sf::Keyboard::W, eCellType::Water);
+            spawnMaterial(grid, sf::Keyboard::L, eCellType::Lava);
+            spawnMaterial(grid, sf::Keyboard::X, eCellType::Stone);
+            spawnMaterial(grid, sf::Keyboard::C, eCellType::Crystal);
+            spawnMaterial(grid, sf::Keyboard::F, eCellType::Fire);
         }
-        spawnMaterial(grid, sf::Keyboard::A, eCellType::Acid);
-        spawnMaterial(grid, sf::Keyboard::E, eCellType::Leaf);
-        spawnMaterial(grid, sf::Keyboard::O, eCellType::Wood);
-        spawnMaterial(grid, sf::Keyboard::D, eCellType::Dirt);
-        spawnMaterial(grid, sf::Keyboard::S, eCellType::Sand);
-        spawnMaterial(grid, sf::Keyboard::W, eCellType::Water);
-        spawnMaterial(grid, sf::Keyboard::L, eCellType::Lava);
-        spawnMaterial(grid, sf::Keyboard::X, eCellType::Stone);
-        spawnMaterial(grid, sf::Keyboard::C, eCellType::Crystal);
-        spawnMaterial(grid, sf::Keyboard::F, eCellType::Fire);
 
-        player_input = {0, 0};
-        float player_speed = 0.05f;
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-            player_input.y = 1;
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-            player_input.y = -1;
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-            player_input.x = -1;
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-            player_input.x = 1;
-        if(player_input.x != 0 || player_input.y != 0)
-            player->rb.vel.x += (float)player_input.x * player_speed;
 
         vec2i mouse_pos = getMousePos();
         grid_mouse_coords = grid.convert_coords(mouse_pos, p_window_size); 
+        if( sf::Keyboard::isKeyPressed(sf::Keyboard::Z)) {
+            AABBf new_view;
 
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
+            vec2i this_mouse_pos = getMousePos();
+            this_mouse_pos= grid.convert_coords(this_mouse_pos, p_window_size);
+
+            new_view.min.x = std::min(this_mouse_pos.x, last_mouse_pos.x);
+            new_view.min.y = std::min(this_mouse_pos.y, last_mouse_pos.y);
+
+            new_view.max.x = std::max(this_mouse_pos.x, last_mouse_pos.x);
+            new_view.max.y = std::max(this_mouse_pos.y, last_mouse_pos.y);
+
+            int max_size = std::max(new_view.size().x, new_view.size().y);
+
+            new_view.max.x = new_view.min.x + max_size;
+            new_view.max.y = new_view.min.y + max_size;
+
+            new_view.min -= vec2f(1, 1);
+            Shape shp;
+            shp.add(new_view, clr_t::Cyan);
+            shp.draw(grid);
         }
 
         for(auto& e : entities) {
@@ -246,11 +306,6 @@ public:
 \
             brush_size = t
 
-        addKeyHook(sf::Keyboard::LShift, 
-            [&]() {
-                camera = new PickupObject(vec2f(grid_mouse_coords), g_camera_sprite);
-                entities.push_back(std::unique_ptr<Entity>(camera));
-            });
         addKeyHook(sf::Keyboard::Q, 
             [&]() {
                 auto t = brush_size;
@@ -274,7 +329,7 @@ public:
             [&]() {
                 SPAWN_REPLICATOR(3, 0, 0);
             });
-        addKeyHook(sf::Keyboard::Up, 
+        addKeyHook(sf::Keyboard::W, 
             [&]() {
                 if(player->isGrounded)
                     player->rb.vel.y = 3.f;

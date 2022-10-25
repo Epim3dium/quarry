@@ -186,35 +186,51 @@ void Grid::redrawChangedSegments() {
         m_redrawSegment(seg);
     }
     m_SegmentsToRerender.clear();
+    for(auto& v : m_PixelsToClean) {
+        if(!inView(v.x, v.y))
+            continue;
+        m_Buffer.setPixel(v.x - m_ViewWindow.min.x, m_ViewWindow.size().y - (v.y - m_ViewWindow.min.y) - 1, get(v).color);
+    }
+    m_PixelsToClean.clear();
 }
 
 //redraw window defines what segment should be redrawn and view_window the size of full window that should fit on the screen
 void Grid::m_drawDebug(window_t& rw) {
     vec2f ratio = vec2f((float)rw.getSize().x / m_ViewWindow.size().x, (float)rw.getSize().y / m_ViewWindow.size().y) ;
 #define DEBUG_DRAW_AABB(vec, clr, off)\
-    for(auto seg : vec) {\
-        seg.min -= m_ViewWindow.min;\
-        seg.max -= m_ViewWindow.min;\
-        sf::Vertex line[2];\
-        line[0] = sf::Vertex(vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y) + off);\
-        line[1] = sf::Vertex(vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y) + off);\
+for(auto seg : vec) {\
+seg.min -= m_ViewWindow.min;\
+seg.max -= m_ViewWindow.min;\
+sf::Vertex line[2];\
+line[0] = sf::Vertex(vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y) + off);\
+line[1] = sf::Vertex(vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y) + off);\
 \
-        line[0].color = clr;\
-        line[1].color = clr;\
-        rw.draw(line, 2, sf::Lines);\
+line[0].color = clr;\
+line[1].color = clr;\
+rw.draw(line, 2, sf::Lines);\
 \
-        line[0].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y) + off;\
-        line[1].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y) + off;\
-        rw.draw(line, 2, sf::Lines);\
-        line[0].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y) + off;\
-        line[1].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y) + off;\
-        rw.draw(line, 2, sf::Lines);\
-        line[0].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y) + off;\
-        line[1].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y) + off;\
-        rw.draw(line, 2, sf::Lines);\
-    }
+line[0].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y) + off;\
+line[1].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y) + off;\
+rw.draw(line, 2, sf::Lines);\
+line[0].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y) + off;\
+line[1].position = vec2f(seg.min.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y) + off;\
+rw.draw(line, 2, sf::Lines);\
+line[0].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.min.y * ratio.y) + off;\
+line[1].position = vec2f(seg.max.x * ratio.x, rw.getSize().y - seg.max.y * ratio.y) + off;\
+rw.draw(line, 2, sf::Lines);\
+}
     DEBUG_DRAW_AABB(m_debugAABBDraw, debug.draw_clr, vec2f(0, 0))
     DEBUG_DRAW_AABB(m_debugAABBUpdate, debug.update_clr, vec2f(2, 2))
+    if(debug.showDraws)
+        for(auto v : m_PixelsToClean) {
+            v -= m_ViewWindow.min;
+            float r = 0.3f * std::min(ratio.x, ratio.y);
+            sf::CircleShape c(r);
+            c.setFillColor(debug.draw_clr);
+            v.y += 1;
+            c.setPosition(vec2f(v.x * ratio.x + r / 2, rw.getSize().y - v.y * ratio.y + r / 2));
+            rw.draw(c);
+        }
     m_debugAABBUpdate.clear();
     m_debugAABBDraw.clear();
 }
@@ -251,11 +267,15 @@ void Grid::render(window_t& rw) {
         m_drawDebug(rw);
 }
 void Grid::drawCellAt(int x, int y, clr_t color) {
-    x = std::clamp<int>(x, 0, m_width);
-    y = std::clamp<int>(y, 0, m_height);
-    vec2i grid_size = m_ViewWindow.size();
-
+    if(!inView(x, y))
+        return;
     m_Buffer.setPixel(x - m_ViewWindow.min.x, m_ViewWindow.size().y - (y - m_ViewWindow.min.y) - 1, color);
+}
+void Grid::drawCellAtClean(int x, int y, clr_t color) {
+    if(!inView(x, y))
+        return;
+    m_Buffer.setPixel(x - m_ViewWindow.min.x, m_ViewWindow.size().y - (y - m_ViewWindow.min.y) - 1, color);
+    m_PixelsToClean.push_back({x, y});
 }
 vec2i Grid::convert_coords(vec2i mouse_pos, vec2f window_size) {
     vec2f size = window_size;

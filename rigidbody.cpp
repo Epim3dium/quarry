@@ -2,6 +2,8 @@
 #include "include/core.h"
 
 bool CircleRigidbody::processRigidbodyCol(CircleRigidbody& other, vec2f& pos, vec2f& other_p) {
+    if(!isActive || !other.isActive)
+        return false;
     if(length(other_p - pos) < radius + other.radius) {
         vec2f n = -normal(other_p - pos);
         float f = 1.f / length(other_p - pos);
@@ -21,6 +23,8 @@ bool CircleRigidbody::processRigidbodyCol(CircleRigidbody& other, vec2f& pos, ve
 
 }
 void CircleRigidbody::update(Grid& g, vec2f& pos) {
+    if(!isActive)
+        return;
     auto isCollidable = [&](const CellVar& cv) {
         return cv.getProperty().density > 1000;
     };

@@ -1,4 +1,8 @@
 #pragma once
+#include <variant>
+#include <optional>
+#include <map>
+
 #include "utils.h"
 #include "sprite.h"
 #include "rigidbody.h"
@@ -9,7 +13,25 @@ class Entity {
         static unsigned int id = 0;
         return id++;
     }
+    std::map<std::string, std::variant<float, std::string, void*> > var;
 public:
+    void SetVar(std::string id, float val) {
+        var[id] = val;
+    }
+    void SetVar(std::string id, std::string val) {
+        var[id] = val;
+    }
+    void SetVar(std::string id, void* val) {
+        var[id] = val;
+    }
+    template<class T>
+    std::optional<T> GetVar(std::string id) {
+        if(var.find(id) != var.end()) {
+            return std::get<T>(var[id]); 
+        }
+        return {};
+    }
+
     QuarrySprite spr;
     CircleRigidbody rb;
     unsigned int type;
@@ -25,11 +47,11 @@ public:
     }
     inline void processEntityCollisions(Entity* other) {
         if(rb.processRigidbodyCol(other->rb, pos, other->pos)) {
-            onHitEntity();
-            other->onHitEntity();
+            onHitEntity(other);
+            other->onHitEntity(this);
         }
     }
-    virtual void onHitEntity() {}
+    virtual void onHitEntity(Entity* e) {}
 
     virtual void update(Grid& g) { }
 

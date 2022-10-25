@@ -22,7 +22,7 @@ void QuarrySprite::m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid) {
             x = w - 1;
         while(x >= 0 && x < w) {
             if(buf[x + y * w].a != 0.f && VecvAABB(vec2i(pos.x + gx, pos.y + gy), grid.getViewWindow()))
-                grid.drawCellAt(pos.x + gx, pos.y + gy, buf[x + y * w]);
+                grid.drawCellAtClean(pos.x + gx, pos.y + gy, buf[x + y * w]);
             x++;
             gx++;
             if(!flip.x)
@@ -35,14 +35,7 @@ void QuarrySprite::m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid) {
     }
 }
 void QuarrySprite::drawAt(vec2i pos, Grid& grid) {
-    auto size = vec2i(m_width, m_height);
-    //drawing pixel buffer
-    if(last_pos.x != 0xffffff && last_pos.y != 0xffffff) {
-        vec2i hsize(roundf((getWidth() + 2) / 2.f), roundf((getHeight() + 2) / 2.f));
-        grid.m_redrawSegment(AABBi{last_pos - hsize , last_pos + hsize});
-    }
     m_drawBufAt(buffer, pos, grid );
-    last_pos = pos;
 }
 
 QuarrySprite::QuarrySprite(const char* filename) {

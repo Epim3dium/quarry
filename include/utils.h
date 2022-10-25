@@ -50,6 +50,15 @@ struct AABB {
     AABB() {}
     AABB(sf::Vector2<T> min_, sf::Vector2<T> max_) : min(min_), max(max_)  {}
 };
+template <class T>
+struct Ray {
+    sf::Vector2<T> pos;
+    sf::Vector2<T> dir;
+};
+
+typedef Ray<int> Rayi;
+typedef Ray<float> Rayf;
+
 typedef AABB<int> AABBi;
 typedef AABB<float> AABBf;
 
