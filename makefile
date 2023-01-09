@@ -3,7 +3,7 @@ DEPS=$(wildcard include/*.h)
 
 CFLAGS=@compile_flags.txt
 
-OBJ=main.o utils.o cell.o core.o quarry.o sprite.o render_shape.o rigidbody.o lodepng.o
+OBJ=main.o utils.o cell.o core.o quarry.o sprite.o shape.o rigidbody.o lodepng.o
 
 %.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) -framework openGL

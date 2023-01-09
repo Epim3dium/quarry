@@ -55,7 +55,8 @@ void QuarryApp::run() {
         if(p_isUpdating) {
             grid.updateChangedSegments();
         }
-        grid.render(window);
+        window.clear(p_bg_color);
+        grid.render(window, &p_frag_shader);
 
         ImGui::SFML::Render(window);
         {
@@ -72,6 +73,11 @@ void QuarryApp::run() {
         p_deltaTime = std::chrono::duration_cast<std::chrono::seconds>(end-start).count();
 
         window.display();
+    }
+}
+void QuarryApp::bindFragShader(const char* filename) {
+    if (!p_frag_shader.loadFromFile(filename, sf::Shader::Fragment)) {
+        std::cerr << "failed to load fragment shader!";
     }
 }
 QuarryApp::QuarryApp(vec2i grid_size_, vec2f win_resolution) 

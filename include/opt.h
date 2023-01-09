@@ -1,10 +1,11 @@
 #pragma once
 
-#define THREADED_UPDATE false 
+#define THREADED_UPDATE true 
 #define MAX_MOVE_COUNT 2048U
 
-#define IMPORT_EXPORT_MAP_DIR "assets/"
+#define bREDRAW_CHANGED_ONLY true
 
+#define IMPORT_EXPORT_MAP_DIR "assets/"
 
 #define UPDATE_SEG_W 16
 #define UPDATE_SEG_H 16

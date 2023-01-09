@@ -38,7 +38,7 @@ void Grid::set(int x, int y, const CellVar& cv) {
         exit(1);
     m_plane[m_idx(x, y)] = cv;
 }
-void Grid::m_updateSegment(vec2i min, vec2i max) {
+void Grid::updateSegment(vec2i min, vec2i max) {
     epi::timer::scope timer("update");
     //high cap has to be 1 less so that max will not be equal min
     min.x = std::clamp<int>(min.x, 0, m_width - 1);
@@ -88,7 +88,7 @@ void Grid::m_analyzeRow(int id_y) {
             }
             if(!shouldUpdate) {
                 if(last_updated) {
-                    m_updateSegment(cur_aabb.min, cur_aabb.max);
+                    updateSegment(cur_aabb.min, cur_aabb.max);
                 }
                 last_updated = false;
                 break;
@@ -120,7 +120,7 @@ void Grid::m_analyzeRow(int id_y) {
         id_x++;
     }
     if(was_last)
-        m_updateSegment(cur_aabb.min, cur_aabb.max);
+        updateSegment(cur_aabb.min, cur_aabb.max);
 }
 void Grid::updateCell(int x, int y) {
     if(get(x, y).type == eCellType::Air)
@@ -182,9 +182,13 @@ void Grid::updateChangedSegments() {
     */
 };
 void Grid::redrawChangedSegments() {
+#if bREDRAW_CHANGED_ONLY 
     for(auto& seg : m_SegmentsToRerender) {
-        m_redrawSegment(seg);
+        redrawSegment(seg);
     }
+#else
+    redrawSegment(getViewWindow());
+#endif
     m_SegmentsToRerender.clear();
     for(auto& v : m_PixelsToClean) {
         if(!inView(v.x, v.y))
@@ -234,7 +238,7 @@ rw.draw(line, 2, sf::Lines);\
     m_debugAABBUpdate.clear();
     m_debugAABBDraw.clear();
 }
-void Grid::m_redrawSegment(AABBi redraw_window) {
+void Grid::redrawSegment(AABBi redraw_window) {
     redraw_window.min.x = std::clamp<int>(redraw_window.min.x, m_ViewWindow.min.x, m_ViewWindow.max.x - 1);
     redraw_window.min.y = std::clamp<int>(redraw_window.min.y, m_ViewWindow.min.y, m_ViewWindow.max.y - 1);
 
@@ -254,14 +258,14 @@ void Grid::m_redrawSegment(AABBi redraw_window) {
         }
     }
 }
-void Grid::render(window_t& rw) {
+void Grid::render(window_t& rw, sf::Shader* frag_shader) {
     sf::Texture tex;
     tex.loadFromImage(m_Buffer);
     sf::Sprite spr(tex);
     vec2f ratio = vec2f((float)rw.getSize().x / tex.getSize().x, (float)rw.getSize().y / tex.getSize().y) ;
     spr.setPosition(0, 0);
     spr.setScale(ratio);
-    rw.draw(spr);
+    rw.draw(spr, frag_shader);
 
     if(debug.isActive)
         m_drawDebug(rw);
@@ -315,36 +319,70 @@ void Grid::mergeAt(const Grid& other, AABBi rect, vec2i fixed) {
                 set(x, y, other.get(x - rect.min.x + fixed.x, y - rect.min.y + fixed.y));
         }
     }
-    m_updateSegment(rect.min, rect.max);
+    updateSegment(rect.min, rect.max);
 }
 //file structure:
 //width height
 //      [row 0]: a b c d e ... width
 //      [row 1]: a b c d e ... width 
 // [row height]: a b c d e ... width
-void Grid::exportToFile(const char* filename) {
+void Map::exportToFile(const char* filename) {
     std::string full_path = (std::string)IMPORT_EXPORT_MAP_DIR + filename;
     std::ofstream out(full_path, std::ios::hex | std::ios::out | std::ios::app);
     if(!out.good())
         std::cerr << "error opening a file: " << filename << "\n";
-    out << m_width << " " << m_height << ";";
-    out.write((char*)(void*)&m_plane[0], sizeof(CellVar) * m_width * m_height);
+    out << w<< " " << h<< ";";
+    out.write((char*)(void*)&data[0], sizeof(CellVar) * w* h);
 }
-Map Grid::importData(const char* filename) {
-    Map m;
+void Map::importFromFile(const char* filename) {
     std::string full_path = (std::string)IMPORT_EXPORT_MAP_DIR + filename;
     std::ifstream in(full_path, std::ios::hex);
     if(!in.good())
         std::cerr << "error opening a file: " << filename << "\n";
 
     char end;
-    in >> m.w >> m.h >> end;
-    m.data = std::vector<CellVar>(m.w*m.h, CellVar(eCellType::Air));
-    in.read((char*)(void*)&m.data[0], sizeof(CellVar) * m.w * m.h);
-
-    return m;
+    in >> w >> h >> end;
+    data = std::vector<CellVar>(w*h, CellVar(eCellType::Air));
+    in.read((char*)(void*)&data[0], sizeof(CellVar) * w * h);
+    return;
+}
+void Grid::importFromMap(AABBi seg, const Map& m) {
+    for(int y = seg.min.y; y < seg.max.y && y < m_height; y++) {
+        for(int x = seg.min.x; x < seg.max.x && x < m_width; x++) {
+            if(y - seg.min.y < m.h && x - seg.min.x < m.w)
+                m_plane[m_idx(x, y)] = m.data[x - seg.min.x + (y - seg.min.y) * m.w];
+        }
+    }
+}
+void Grid::importFromFile(const char* filename, AABBi seg) {
+    Map m;
+    m.importFromFile(filename);
+    importFromMap(seg, m);
 }
 void Grid::importFromFile(const char* filename) {
-    auto m = importData(filename);
+    Map m;
+    m.importFromFile(filename);
     *this = Grid(m.w, m.h, m.data);
+}
+Map Grid::exportToMap(AABBi seg) {
+    Map m;
+    m.w = seg.size().x;
+    m.h = seg.size().y;
+    m.data = std::vector<CellVar>(m.w * m.h, eCellType::Air);
+    for(int y = seg.min.y; y < seg.max.y; y++) {
+        for(int x = seg.min.x; x < seg.max.x; x++) {
+             m.data[x - seg.min.x + (y - seg.min.y) * m.w] = m_plane[m_idx(x, y)];
+        }
+    }
+    return m;
+}
+void Grid::exportToFile(const char* filename, AABBi seg) {
+    exportToMap(seg).exportToFile(filename);
+}
+void Grid::exportToFile(const char* filename) {
+    Map m;
+    m.w = m_width;
+    m.h = m_height;
+    m.data = m_plane;
+    m.exportToFile(filename);
 }

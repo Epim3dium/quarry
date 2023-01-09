@@ -17,6 +17,8 @@ struct Map {
     size_t h;
 
     std::vector<CellVar> data;
+    void exportToFile(const char* filename);
+    void importFromFile(const char* filename);
 };
 class Grid {
 private:
@@ -43,8 +45,6 @@ private:
 
     void updateCell(int x, int y);
 
-    void m_updateSegment(vec2i min, vec2i max);
-    void m_redrawSegment(AABBi redraw_window);
     void m_update(AABBi redraw_window);
 
     void m_analyzeRow(int id_y);
@@ -55,6 +55,8 @@ private:
 
     void m_drawDebug(window_t& window);
 public:
+    void updateSegment(vec2i min, vec2i max);
+    void redrawSegment(AABBi redraw_window);
     struct {
         bool isActive = false;
         bool showUpdated = true;
@@ -76,8 +78,8 @@ public:
         sf::Image t(m_Buffer);
         m_Buffer.create(aabb.size().x, aabb.size().y, CellVar::properties[eCellType::Air].colors.front());
 
-        m_updateSegment(aabb.min, aabb.max);
-        m_redrawSegment(aabb);
+        updateSegment(aabb.min, aabb.max);
+        redrawSegment(aabb);
     }
 
     inline bool inBounds(int x, int y) const {
@@ -121,15 +123,20 @@ public:
     void updateChangedSegments();
 
     void redrawChangedSegments();
-    void render(window_t& rw);
+    void render(window_t& rw, sf::Shader* frag_shader = nullptr);
 
     //rect in which other should be fitted(fixed point will be the coordinate of bl_corner in rect)
     void mergeAt(const Grid& other, AABBi rect = AABBi(vec2i(0, 0), vec2i(-1, -1)), vec2i fixed = vec2i(0, 0));
 
-    void exportToFile(const char* filename);
+
+    void importFromMap(AABBi seg, const Map& m);
+
+    void importFromFile(const char* filename, AABBi seg);
     void importFromFile(const char* filename);
 
-    static Map importData(const char* filename);
+    Map exportToMap(AABBi seg);
+    void exportToFile(const char* filename, AABBi seg);
+    void exportToFile(const char* filename);
 
     Grid(int w, int h, const std::vector<CellVar>& vec = std::vector<CellVar>());
     friend QuarrySprite;

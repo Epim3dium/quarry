@@ -40,10 +40,6 @@ bool RayVAABB(vec2f ray_origin, vec2f ray_dir,
 {
     vec2f invdir = { 1.0f / ray_dir.x, 1.0f / ray_dir.y };
     vec2f t_size = target.size();
-    //VVVVVVVVVVVVV
-    //if((int)target.size.y % 2 == 0 && target.pos.y > ray_origin.y)
-    //t_size -= vec2f(0, 1);
-    //^^^^^^^^^^^^^
     vec2f t_near = (target.center() - t_size / 2.f - ray_origin);
     t_near.x *= invdir.x;
     t_near.y *= invdir.y;
@@ -83,6 +79,24 @@ bool RayVAABB(vec2f ray_origin, vec2f ray_dir,
         }
     }
     return true;
+}
+vec2f getClosestPoint(Rayf ray, vec2f point) {
+    vec2f pt_v = point - ray.pos;
+    float ray_dir_len = length(ray.dir);
+    if (ray_dir_len <= 0) {
+        //std::cout<<"invalid velocity Value!\n";
+        return { 0, 0 };
+    }
+    if (ray_dir_len == 0) return {0, 0};
+    vec2f seg_v_unit = ray.dir / ray_dir_len;
+    float proj = dot(pt_v, seg_v_unit);
+    if (proj <= 0)
+        return ray.pos;
+    if (proj >= ray_dir_len)
+        return ray.pos + ray.dir;
+    vec2f proj_v = seg_v_unit * proj;
+    vec2f closest = proj_v + ray.pos;
+    return closest;
 }
 float sign(float f) {
     return std::copysignf(1.f, f);

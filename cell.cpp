@@ -119,7 +119,9 @@ static bool checkSpreadFire(Grid& grid, const vec2i& v, const vec2i& other) {
     return false;
 };
 void CellVar::addReplicatorMap(const char* filename, unsigned char id) {
-    replicator_maps[id] = Grid::importData(filename);
+    Map m;
+    m.importFromFile(filename);
+    replicator_maps[id] = m;
 }
 
 void CellVar::InitializeProperties() {

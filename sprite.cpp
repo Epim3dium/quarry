@@ -21,8 +21,17 @@ void QuarrySprite::m_drawBufAt(std::vector<clr_t>& buf, vec2i pos, Grid& grid) {
         if(!flip.x)
             x = w - 1;
         while(x >= 0 && x < w) {
-            if(buf[x + y * w].a != 0.f && VecvAABB(vec2i(pos.x + gx, pos.y + gy), grid.getViewWindow()))
-                grid.drawCellAtClean(pos.x + gx, pos.y + gy, buf[x + y * w]);
+            if(buf[x + y * w].a != 0.f && VecvAABB(vec2i(pos.x + gx, pos.y + gy), grid.getViewWindow())) {
+                clr_t newclr = buf[x + y * w];
+                clr_t oldclr = grid.get(pos.x + gx, pos.y + gy).color;
+                float alpha = newclr.a / 255.f;
+                clr_t finalclr = clr_t(
+                        std::clamp<unsigned char>((oldclr.r * (1.f - alpha) + newclr.r * (alpha)), 0, 255), 
+                        std::clamp<unsigned char>((oldclr.g * (1.f - alpha) + newclr.g * (alpha)), 0, 255), 
+                        std::clamp<unsigned char>((oldclr.b * (1.f - alpha) + newclr.b * (alpha)), 0, 255), 
+                        255);
+                grid.drawCellAtClean(pos.x + gx, pos.y + gy, finalclr);
+            }
             x++;
             gx++;
             if(!flip.x)

@@ -4,18 +4,18 @@
 bool CircleRigidbody::processRigidbodyCol(CircleRigidbody& other, vec2f& pos, vec2f& other_p) {
     if(!isActive || !other.isActive)
         return false;
-    if(length(other_p - pos) < radius + other.radius) {
-        vec2f n = -normal(other_p - pos);
-        float f = 1.f / length(other_p - pos);
+    Rayf ray  = {pos, this->vel};
+    vec2f closest = getClosestPoint(ray, other_p);
+    if(length(other_p - closest) < radius + other.radius) {
+        vec2f n = normal(other_p - closest);
+        float f = 1.f / length(other_p - pos) / 2.f;
         if(length(n) != 0.f) {
-            float d = std::clamp(dot(vel, n), -INFINITY, 0.f);
-
             //add bounce
-            vel.x -= (1.f + physics.bounciness + f) * (n.x * d); 
-            vel.y -= (1.f + physics.bounciness + f) * (n.y * d);
+            vel.x -= (1.f + f) * (n.x); 
+            vel.y -= (1.f + f) * (n.y);
 
-            other.vel.x += (1.f + other.physics.bounciness + f) * (n.x * d); 
-            other.vel.y += (1.f + other.physics.bounciness + f) * (n.y * d);
+            other.vel.x += (1.f + f) * (n.x); 
+            other.vel.y += (1.f + f) * (n.y);
         }
         return true;
     }

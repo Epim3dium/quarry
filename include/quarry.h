@@ -21,6 +21,10 @@ class QuarryApp {
     window_t window;
 
 protected:
+    sf::Shader p_frag_shader;
+    clr_t p_bg_color = clr_t(5, 10, 25);
+    void bindFragShader(const char* filename);
+
     bool p_isActive = true;
     bool p_isUpdating = true;
 

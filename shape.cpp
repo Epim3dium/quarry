@@ -1,6 +1,6 @@
-#include "render_shape.h"
+#include "shape.h"
 
-void Shape::add(Rayf ray, clr_t clr) {
+void Shape::add(Rayf ray) {
     vec2f a = ray.pos;
     vec2f b = ray.pos + ray.dir;
     int steep = abs(b.y - a.y) > abs(b.x - a.x);
@@ -25,10 +25,10 @@ void Shape::add(Rayf ray, clr_t clr) {
     }
     for (; a.x <= b.x; a.x++) {
         if (steep) {
-            m_buffer.push_back({vec2i( a.y, a.x ), clr});
+            m_buffer.push_back(vec2i( a.y, a.x ));
         }
         else {
-            m_buffer.push_back({vec2i( a.x, a.y ), clr});
+            m_buffer.push_back(vec2i( a.x, a.y ));
         }
         err -= dy;
         if (err < 0) {
@@ -37,19 +37,19 @@ void Shape::add(Rayf ray, clr_t clr) {
         }
     }
 }
-void Shape::add(AABBf aabb, clr_t clr) {
+void Shape::add(AABBf aabb) {
     for(int x = aabb.min.x; x < aabb.max.x; x++) {
-        m_buffer.push_back({vec2i(x, aabb.min.y), clr});
-        m_buffer.push_back({vec2i(x, aabb.max.y), clr});
+        m_buffer.push_back(vec2i(x, aabb.min.y));
+        m_buffer.push_back(vec2i(x, aabb.max.y));
     }
-    for(int y = aabb.min.y; y < aabb.max.y; y++) {
-        m_buffer.push_back({vec2i(aabb.min.x, y), clr});
-        m_buffer.push_back({vec2i(aabb.max.x, y), clr});
+    for(int y = aabb.min.y; y <= aabb.max.y; y++) {
+        m_buffer.push_back(vec2i(aabb.min.x, y));
+        m_buffer.push_back(vec2i(aabb.max.x, y));
     }
 }
 
-void Shape::draw(Grid& g) {
+void Shape::draw(Grid& g, clr_t clr) {
     for(auto& v : m_buffer)
-        g.drawCellAtClean(v.pos.x, v.pos.y, v.clr);
+        g.drawCellAtClean(v.x, v.y, clr);
     m_buffer.clear();
 }

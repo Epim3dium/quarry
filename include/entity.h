@@ -13,9 +13,12 @@ class Entity {
         static unsigned int id = 0;
         return id++;
     }
-    std::map<std::string, std::variant<float, std::string, void*> > var;
+    std::map<std::string, std::variant<vec2f, float, std::string, void*> > var;
 public:
     void SetVar(std::string id, float val) {
+        var[id] = val;
+    }
+    void SetVar(std::string id, vec2f val) {
         var[id] = val;
     }
     void SetVar(std::string id, std::string val) {
