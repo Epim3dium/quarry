@@ -1,5 +1,5 @@
 #pragma once
-#include "core.h"
+#include "grid.hpp"
 #include "utils.h"
 
 class Shape {

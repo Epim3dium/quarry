@@ -1,7 +1,10 @@
 #pragma once
 
+#include "SFML/Graphics/RenderTarget.hpp"
+#include "SFML/Graphics/RenderTexture.hpp"
+#include "SFML/Graphics/RenderWindow.hpp"
 #include "imgui.h"
-#include "core.h"
+#include "grid.hpp"
 
 enum class eKeyHookState {
     isPressed,
@@ -19,6 +22,7 @@ class QuarryApp {
     std::map<sf::Keyboard::Key,std::function<void(void)> > pressed_keypress_hooks;
     std::map<sf::Keyboard::Key,std::function<void(void)> > released_keypress_hooks;
     window_t window;
+    sf::RenderTexture grid_window;
 
 protected:
     sf::Shader p_frag_shader;
@@ -53,6 +57,7 @@ protected:
 public:
     virtual bool setup(Grid& grid) { return true; }
     virtual void update(Grid& grid) {}
+    virtual void draw(sf::RenderTarget& rw, const Grid& grid) {}
     virtual void cleanup() {}
     void run();
 

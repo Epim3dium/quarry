@@ -1,7 +1,9 @@
 #include <thread>
 #include <fstream>
 
-#include "core.h"
+#include "SFML/Graphics/RenderTarget.hpp"
+#include "SFML/Graphics/Texture.hpp"
+#include "grid.hpp"
 #include "timer.h"
 #include "sprite.h"
 #include "opt.h"
@@ -9,11 +11,7 @@
 Grid::Grid(int w, int h, const std::vector<CellVar>& vec) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_W * h / UPDATE_SEG_H), m_plane(vec){
     if(vec.size() != w * h)
         m_plane = std::vector<CellVar>(w * h, CellVar(eCellType::Air));
-    if(CellVar::properties.size() != (int)eCellType::Bedrock + 1) {
-        std::cerr << "Properties uninitialized";
-        std::exit(0);
-    }
-    m_Buffer.create(w, h, CellVar::properties[eCellType::Air].colors.front());
+    m_Buffer.create(w, h, CellVar::properties[static_cast<size_t>(eCellType::Air)].colors.front());
     setViewWindow({{0, 0}, {w, h}});
 }
 void Grid::set(int x, int y, const CellVar& cv) {
@@ -133,7 +131,7 @@ void Grid::updateCell(int x, int y) {
         set(x, y, eCellType::Air);
         return;
     }
-    auto& cur_prop = CellVar::properties[get(x, y).type];
+    auto& cur_prop = get(x, y).getProperty();
     //using m_idx to bypass setting and causing unnecessary checks
     m_plane[m_idx(x, y)].last_tick_updated = tick_passed_total;
     m_plane[m_idx(x, y)].age++;
@@ -199,7 +197,7 @@ void Grid::redrawChangedSegments() {
 }
 
 //redraw window defines what segment should be redrawn and view_window the size of full window that should fit on the screen
-void Grid::m_drawDebug(window_t& rw) {
+void Grid::m_drawDebug(sf::RenderTarget& rw) {
     vec2f ratio = vec2f((float)rw.getSize().x / m_ViewWindow.size().x, (float)rw.getSize().y / m_ViewWindow.size().y) ;
 #define DEBUG_DRAW_AABB(vec, clr, off)\
 for(auto seg : vec) {\
@@ -258,13 +256,11 @@ void Grid::redrawSegment(AABBi redraw_window) {
         }
     }
 }
-void Grid::render(window_t& rw, sf::Shader* frag_shader) {
+void Grid::render(sf::RenderTexture& rw, sf::Shader* frag_shader) {
     sf::Texture tex;
     tex.loadFromImage(m_Buffer);
     sf::Sprite spr(tex);
-    vec2f ratio = vec2f((float)rw.getSize().x / tex.getSize().x, (float)rw.getSize().y / tex.getSize().y) ;
     spr.setPosition(0, 0);
-    spr.setScale(ratio);
     rw.draw(spr, frag_shader);
 
     if(debug.isActive)

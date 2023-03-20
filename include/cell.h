@@ -37,6 +37,7 @@ enum class eCellType : unsigned char {
     Fire,
 
     Bedrock,
+    COUNT,
 };
 const char* to_str(eCellType type);
 enum eState {
@@ -77,7 +78,7 @@ private:
     //maps can be of max size 
     static std::map<unsigned char, Map> replicator_maps;
 public:
-    static std::map<eCellType, CellConstants> properties;
+    static CellConstants properties[(size_t)eCellType::COUNT];
     unsigned long getID() const {return id;}
 
     //if not working means you havent called InitializeProperties()
@@ -136,14 +137,14 @@ public:
     }var;
 
     const CellConstants& getProperty() const {
-        return properties[type];
+        return properties[static_cast<size_t>(type)];
     }
     CellVar(eCellType type_) 
         : type(type_), id(m_getNextID()), age(0), move_count(0), last_tick_updated(0)
     {
         std::memset(&var, 0, sizeof(VarUnion));
 
-        auto& all_colors = properties[type].colors;
+        auto& all_colors = properties[static_cast<size_t>(type)].colors;
         color = all_colors[ g_rng.Random<size_t>(0U, all_colors.size()) ];
     }
     friend Grid;

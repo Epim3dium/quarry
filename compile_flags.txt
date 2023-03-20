@@ -6,8 +6,8 @@
 -I/opt/homebrew/Cellar/sfml/2.5.1_2/include
 -I./include/.
 -I./vendor/.
--I./vendor/lodepng/.
 -I./vendor/imgui/.
+-I./vendor/collision_simulation/include/.
 -lsfml-graphics
 -lsfml-window
 -lsfml-system

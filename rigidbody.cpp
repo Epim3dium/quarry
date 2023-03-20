@@ -1,5 +1,5 @@
 #include "include/rigidbody.h"
-#include "include/core.h"
+#include "include/grid.hpp"
 
 bool CircleRigidbody::processRigidbodyCol(CircleRigidbody& other, vec2f& pos, vec2f& other_p) {
     if(!isActive || !other.isActive)

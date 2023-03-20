@@ -1,7 +1,8 @@
+#include <cstddef>
 #include <random>
 
 #include "cell.h"
-#include "core.h"
+#include "grid.hpp"
 #include "opt.h"
 
 //TODO:
@@ -10,7 +11,7 @@
 //acid
 
 std::map<unsigned char, Map> CellVar::replicator_maps = {};
-std::map<eCellType, CellConstants> CellVar::properties = {};
+CellConstants CellVar::properties[static_cast<size_t>(eCellType::COUNT)];
 
 #define FOR_CELLS_AROUND_ME(func)\
 func(grid, v, vec2i(v.x, v.y + 1));\
@@ -50,10 +51,10 @@ const char* to_str(eCellType type) {
     return "none";
 }
 static void handleBasicPowder(vec2i v, Grid& grid) {
-    const auto isSwappable = [&](const int& otherx, const int& othery) {
-        auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
+    const auto isSwappable = [&](const int& otherx, const int& othery)->bool {
+        auto& other_prop = grid.get({otherx, othery}).getProperty(); 
         return other_prop.state == eState::Liquid || other_prop.state == eState::Gas || 
-            (other_prop.state == eState::Powder  && other_prop.density < CellVar::properties[grid.get(v).type].density);
+            (other_prop.state == eState::Powder  && other_prop.density < grid.get(v).getProperty().density);
     };
     if(isSwappable(v.x, v.y - 1)) {
         grid.swap_at(v, {v.x, v.y -1});
@@ -67,8 +68,8 @@ static void handleBasicPowder(vec2i v, Grid& grid) {
 }
 static void handleBasicLiquid(vec2i v, Grid& grid) {
     const auto isSwappable = [&](const int& otherx, const int& othery) {
-        auto& my_prop = CellVar::properties[grid.get(v).type]; 
-        auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
+        auto& my_prop = grid.get(v).getProperty(); 
+        auto& other_prop = grid.get({otherx, othery}).getProperty();
         return (other_prop.state == eState::Liquid || other_prop.state == eState::Gas) && other_prop.density < my_prop.density;
     };
     //check if can be swapped and advance move counter used to limit number of updates caused by each liquid cell
@@ -126,7 +127,7 @@ void CellVar::addReplicatorMap(const char* filename, unsigned char id) {
 
 void CellVar::InitializeProperties() {
     //Empty space
-    CellVar::properties[eCellType::Air] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Air)] = CellConstants(
         //powdery
         eState::Gas,
         //density
@@ -140,7 +141,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(10, 20, 50)}
     );
-    CellVar::properties[eCellType::Smoke] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Smoke)] = CellConstants(
         //powdery
         eState::Gas,
         //density
@@ -152,8 +153,8 @@ void CellVar::InitializeProperties() {
             const auto& me = grid.get(v);
             //return true if other cell is gas and its density is lower than mine
             const auto isSwappable = [&](const int& otherx, const int& othery) {
-                auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
-                return other_prop.state == eState::Gas && other_prop.density > CellVar::properties[grid.get(v).type].density;
+                auto& other_prop = grid.get({otherx, othery}).getProperty(); 
+                return other_prop.state == eState::Gas && other_prop.density > grid.get(v).getProperty().density;
             };
             //swaps with swappable cells and advances move counter used to deactivate cells that update too much causing fps drops
             const auto trySwapping = [&](const vec2i& me, const vec2i& other) {
@@ -185,7 +186,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(130, 130, 130) }
     );
-    CellVar::properties[eCellType::Steam] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Steam)] = CellConstants(
         //powdery
         eState::Gas,
         //density
@@ -200,12 +201,12 @@ void CellVar::InitializeProperties() {
                 return;
             }
 #endif
-            CellVar::properties[eCellType::Smoke].update_behaviour(v, grid);
+            CellVar::properties[static_cast<size_t>(eCellType::Smoke)].update_behaviour(v, grid);
         },
         //colors
         {clr_t(255, 255, 255) }
     );
-    CellVar::properties[eCellType::Sand] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Sand)] = CellConstants(
         //powdery
         eState::Powder,
         //density
@@ -217,7 +218,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(220, 220, 80), clr_t(250, 250, 40) }
     );
-    CellVar::properties[eCellType::Cobblestone] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Cobblestone)] = CellConstants(
         //powdery
         eState::Powder,
         //density
@@ -229,7 +230,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(150, 150, 150), clr_t(100, 100, 100) }
     );
-    CellVar::properties[eCellType::Dirt] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Dirt)] = CellConstants(
         //powdery
         eState::Powder,
         //density
@@ -264,7 +265,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(120, 90, 15), clr_t(100, 80, 10) }
     );
-    CellVar::properties[eCellType::CompressedDirt] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::CompressedDirt)] = CellConstants(
         //powdery
         eState::Powder,
         //density
@@ -297,7 +298,7 @@ void CellVar::InitializeProperties() {
     );
 #define MAX_CRUMBLING_STONE_PROPAGATION 25
 #define CRUMBLING_STONE_RNG_RANGE 3
-    CellVar::properties[eCellType::CrumblingStone] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::CrumblingStone)] = CellConstants(
         //powdery
         eState::Powder,
         //density
@@ -329,7 +330,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(45, 45, 60), clr_t(40, 40, 50) }
     );
-    CellVar::properties[eCellType::Crystal] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Crystal)] = CellConstants(
         //powdery
         eState::Powder,
         //density
@@ -370,7 +371,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(116, 160, 250), clr_t(150, 190, 250), clr_t(120, 120, 220)}
     );
-    CellVar::properties[eCellType::Stone] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Stone)] = CellConstants(
         //powdery
         eState::Soild,
         //density
@@ -385,7 +386,7 @@ void CellVar::InitializeProperties() {
         {clr_t(70, 70, 70)}
     );
     //liquids keep eating framerate so i need a limiter
-    CellVar::properties[eCellType::Water] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Water)] = CellConstants(
         //powdery
         eState::Liquid,
         //density
@@ -399,7 +400,7 @@ void CellVar::InitializeProperties() {
         //reaction with lava -> change to smoke
     );
 
-    CellVar::properties[eCellType::Lava] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Lava)] = CellConstants(
         //powdery
         eState::Liquid,
         //density
@@ -432,7 +433,7 @@ void CellVar::InitializeProperties() {
         },
         {clr_t(220, 90, 30)}
     );
-    CellVar::properties[eCellType::Acid] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Acid)] = CellConstants(
         //powdery
         eState::Liquid,
         //density
@@ -466,7 +467,7 @@ void CellVar::InitializeProperties() {
         //reactions for acid are included at the end of all types
     );
 
-    CellVar::properties[eCellType::Grass] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Grass)] = CellConstants(
         //powdery
         eState::Powder,
         //density
@@ -497,7 +498,7 @@ void CellVar::InitializeProperties() {
         {clr_t(30, 120, 30), clr_t(35, 130, 35)}
     );
 
-    CellVar::properties[eCellType::Seed] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Seed)] = CellConstants(
         //powdery
         eState::Powder,
         //density
@@ -521,7 +522,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(10, 100, 10)}
     );
-    CellVar::properties[eCellType::Wood] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Wood)] = CellConstants(
         //powdery
         eState::Soild,
         //density
@@ -536,8 +537,8 @@ void CellVar::InitializeProperties() {
             //remember that 0 is supposed to always be 'balanced' [aka not updating] state
             if(me.var.Wood.down_timer_len > 0) {
                 const auto is_replaceable = [&](const int& otherx, const int& othery) {
-                    auto& my_prop = CellVar::properties[grid.get(v).type]; 
-                    auto& other_prop = CellVar::properties[grid.get({otherx, othery}).type]; 
+                    auto& my_prop = grid.get(v).getProperty(); 
+                    auto& other_prop = grid.get({otherx, othery}).getProperty(); 
                     return grid.get(otherx, othery).type == eCellType::Air;
                 };
 
@@ -587,7 +588,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(90, 40, 10)}
     );
-    CellVar::properties[eCellType::Leaf] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Leaf)] = CellConstants(
         //powdery
         eState::Soild,
         //density
@@ -620,7 +621,7 @@ void CellVar::InitializeProperties() {
         {clr_t(50, 150, 50), clr_t(50, 170, 50), clr_t(50, 200, 50)}
     );
 //determines flame size
-    CellVar::properties[eCellType::Fire] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Fire)] = CellConstants(
         eState::Gas,
         //density
         -10,
@@ -676,14 +677,14 @@ void CellVar::InitializeProperties() {
                     grid.set(v, me);
                 }
                 //movement behaviour
-                CellVar::properties[eCellType::Smoke].update_behaviour(v, grid);
+                CellVar::properties[static_cast<size_t>(eCellType::Smoke)].update_behaviour(v, grid);
             }
         },
         //color will be changing through lifetime
         {clr_t(253,207,88)}
     );
 
-    CellVar::properties[eCellType::Replicator] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Replicator)] = CellConstants(
         //powdery
         eState::Soild,
         //density
@@ -724,7 +725,7 @@ void CellVar::InitializeProperties() {
         //colors
         {clr_t(255, 0, 255)}
     );
-    CellVar::properties[eCellType::Bedrock] = CellConstants(
+    CellVar::properties[static_cast<size_t>(eCellType::Bedrock)] = CellConstants(
         //powdery
         eState::Soild,
         //density

@@ -1,4 +1,5 @@
 #include "quarry.h"
+#include "SFML/Window/VideoMode.hpp"
 #include "imgui.h"
 #include "imgui-SFML.h"
 
@@ -52,11 +53,23 @@ void QuarryApp::run() {
         ImGui::SFML::Update(window, ImGuiClock.restart());
         update(grid);
 
+        //if grid updating in enabled
         if(p_isUpdating) {
             grid.updateChangedSegments();
         }
         window.clear(p_bg_color);
-        grid.render(window, &p_frag_shader);
+        grid.render(grid_window, &p_frag_shader);
+        draw(grid_window, grid);
+        sf::Sprite spr;
+        auto& tex = grid_window.getTexture();
+        spr.setTexture(tex);
+        auto half_size = (vec2f)tex.getSize() / 2.f;
+        spr.setPosition({0, 0});
+        spr.setOrigin(half_size);
+        vec2f ratio = vec2f((float)window.getSize().x / tex.getSize().x, -(float)window.getSize().y / tex.getSize().y);
+        spr.setScale(ratio);
+        spr.setPosition(half_size.x * ratio.x, -half_size.y * ratio.y);
+        window.draw(spr);
 
         ImGui::SFML::Render(window);
         {
@@ -83,6 +96,7 @@ void QuarryApp::bindFragShader(const char* filename) {
 QuarryApp::QuarryApp(vec2i grid_size_, vec2f win_resolution) 
     : window(sf::VideoMode(win_resolution.x, win_resolution.y), "QuarryApp"), p_grid_size(grid_size_), p_window_size(win_resolution)
 { 
+    grid_window.create(grid_size_.x, grid_size_.y);
     CellVar::InitializeProperties();
     window.setFramerateLimit(60);
 

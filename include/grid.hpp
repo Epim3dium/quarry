@@ -3,6 +3,8 @@
 #include <iostream>
 #include <functional>
 
+#include "SFML/Graphics/RenderTarget.hpp"
+#include "SFML/Graphics/Texture.hpp"
 #include "utils.h"
 #include "cell.h"
 
@@ -53,7 +55,7 @@ private:
     std::vector<AABBi> m_debugAABBDraw;
     std::vector<AABBi> m_debugAABBUpdate;
 
-    void m_drawDebug(window_t& window);
+    void m_drawDebug(sf::RenderTarget& window);
 public:
     void updateSegment(vec2i min, vec2i max);
     void redrawSegment(AABBi redraw_window);
@@ -76,7 +78,7 @@ public:
         m_ViewWindow = aabb;
 
         sf::Image t(m_Buffer);
-        m_Buffer.create(aabb.size().x, aabb.size().y, CellVar::properties[eCellType::Air].colors.front());
+        m_Buffer.create(aabb.size().x, aabb.size().y, CellVar::properties[static_cast<size_t>(eCellType::Air)].colors.front());
 
         updateSegment(aabb.min, aabb.max);
         redrawSegment(aabb);
@@ -123,7 +125,7 @@ public:
     void updateChangedSegments();
 
     void redrawChangedSegments();
-    void render(window_t& rw, sf::Shader* frag_shader = nullptr);
+    void render(sf::RenderTexture& rw, sf::Shader* frag_shader = nullptr);
 
     //rect in which other should be fitted(fixed point will be the coordinate of bl_corner in rect)
     void mergeAt(const Grid& other, AABBi rect = AABBi(vec2i(0, 0), vec2i(-1, -1)), vec2i fixed = vec2i(0, 0));
