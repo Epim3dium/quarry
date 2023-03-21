@@ -17,18 +17,18 @@ Grid::Grid(int w, int h, const std::vector<CellVar>& vec) : m_width(w), m_height
 void Grid::set(int x, int y, const CellVar& cv) {
     int id_x = x / UPDATE_SEG_W;
     int id_y = y / UPDATE_SEG_H;
-    m_section_list[id_x + id_y * m_width / UPDATE_SEG_W].toUpdateNextFrame = true;
+    m_section_list[id_x + id_y * m_width / UPDATE_SEG_W].wakeUp();
     if(x % UPDATE_SEG_W == 0 && id_x != 0) {
-        m_section_list[id_x - 1 + id_y * m_width / UPDATE_SEG_W].toUpdateNextFrame = true;
+        m_section_list[id_x - 1 + id_y * m_width / UPDATE_SEG_W].wakeUp();
     }
     if(x % UPDATE_SEG_W == UPDATE_SEG_W - 1 && id_x != m_width / UPDATE_SEG_W - 1) {
-        m_section_list[id_x + 1 + id_y * m_width / UPDATE_SEG_W].toUpdateNextFrame = true;
+        m_section_list[id_x + 1 + id_y * m_width / UPDATE_SEG_W].wakeUp();
     }
     if(y % UPDATE_SEG_H== 0 && id_y != 0) {
-        m_section_list[id_x + (id_y - 1) * m_width / UPDATE_SEG_W].toUpdateNextFrame = true;
+        m_section_list[id_x + (id_y - 1) * m_width / UPDATE_SEG_W].wakeUp();
     }
     if(y % UPDATE_SEG_H== UPDATE_SEG_H- 1 && id_y != m_height / UPDATE_SEG_H- 1) {
-        m_section_list[id_x + (id_y + 1) * m_width / UPDATE_SEG_W].toUpdateNextFrame = true;
+        m_section_list[id_x + (id_y + 1) * m_width / UPDATE_SEG_W].wakeUp();
     }
 
 
@@ -37,7 +37,6 @@ void Grid::set(int x, int y, const CellVar& cv) {
     m_plane[m_idx(x, y)] = cv;
 }
 void Grid::updateSegment(vec2i min, vec2i max) {
-    epi::timer::scope timer("update");
     //high cap has to be 1 less so that max will not be equal min
     min.x = std::clamp<int>(min.x, 0, m_width - 1);
     min.y = std::clamp<int>(min.y, 0, m_height - 1);
@@ -59,22 +58,22 @@ void Grid::updateSegment(vec2i min, vec2i max) {
 #define RIGHT_LEFT\
         for(int x = max.x - 1; x >= min.x; x--)
 #define VERT_STYLE DOWN_UP
-    if(left_to_right)
+
+    if(left_to_right) {
         VERT_STYLE 
             LEFT_RIGHT
                 updateCell(x, y);
-    else 
+    } else {
         VERT_STYLE 
            RIGHT_LEFT 
                 updateCell(x, y);
+    }
 }
 void Grid::m_analyzeRow(int id_y) {
     int id_x = 0;
     bool last_updated = false;
     AABBi cur_aabb = {{0xffffff, 0xffffff}, {}};
-    bool was_last = false;
     while(id_x < m_width / UPDATE_SEG_W) {
-        was_last = false;
         //m_updateSection(id_x + id_y * m_width / UPDATE_SEG_W);
         do {
             size_t index = id_x + id_y * m_width / UPDATE_SEG_W;
@@ -109,7 +108,6 @@ void Grid::m_analyzeRow(int id_y) {
                     cur_aabb.max = seg.max;
                     last_updated = true;
                 }
-                was_last = true;
                 m_SegmentsToRerender.push_back(seg);
                 //m_updateSegment(seg.min, seg.max);
             }
@@ -117,7 +115,7 @@ void Grid::m_analyzeRow(int id_y) {
         //
         id_x++;
     }
-    if(was_last)
+    if(last_updated)
         updateSegment(cur_aabb.min, cur_aabb.max);
 }
 void Grid::updateCell(int x, int y) {

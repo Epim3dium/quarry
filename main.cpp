@@ -5,6 +5,7 @@
 #include "SFML/Graphics/RenderTarget.hpp"
 #include "SFML/Graphics/RenderWindow.hpp"
 #include "SFML/Graphics/Texture.hpp"
+#include "cell.h"
 #include "imgui.h"
 #include "imgui-SFML.h"
 
@@ -38,8 +39,6 @@ public:
     eCellType brush_material = eCellType::Sand;
     vec2i last_mouse_pos = {-1, -1};
     vec2i grid_mouse_coords;
-
-    vec2f ImGuiWindowSize = vec2f(WW/5, WH / 2);
 
     vec2i player_input = {0, 0};
 
@@ -88,7 +87,6 @@ public:
         //imgui
         {
             ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSize(ImVec2(ImGuiWindowSize.x, ImGuiWindowSize.y), ImGuiCond_FirstUseEver);
 
             ImGui::Begin("Demo window", nullptr);
 
@@ -139,7 +137,7 @@ public:
                 grid.mergeAt(tmp_grid);
             }
             //brush size
-            ImGui::SliderInt("brush", &brush_size, 1, 32);
+            ImGui::SliderInt("brush", &brush_size, 1, 64);
             //material selection
             {
                 std::vector<eCellType> all_materials;
@@ -273,6 +271,7 @@ public:
 int main()
 {
     Demo app;
+    std::cerr << sizeof(CellVar);
     app.run();
     return 0;
 }

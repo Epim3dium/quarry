@@ -13,6 +13,10 @@ class QuarrySprite;
 struct SegInfo {
     bool toUpdate = false;
     bool toUpdateNextFrame = false;
+    void wakeUp() {
+        toUpdate = true;
+        toUpdateNextFrame = true;
+    }
 };
 struct Map {
     size_t w;

@@ -118,7 +118,7 @@ public:
             bool bgrew_grass;
         }Dirt;
         struct {
-            bool isCrumbled;
+            char CurSide;
         }CompressedDirt;
         struct {
             unsigned char lvl;

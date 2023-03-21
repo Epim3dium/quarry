@@ -4,6 +4,7 @@
 #include "cell.h"
 #include "grid.hpp"
 #include "opt.h"
+#include "utils.h"
 
 //TODO:
 //Cobblestone + water = dirt
@@ -82,13 +83,6 @@ static void handleBasicLiquid(vec2i v, Grid& grid) {
     };
     if(trySwapping(v, {v.x, v.y - 1}))
         return;
-    {
-        int first_side_down = g_rng.Random() > 0.5f ? 1 : -1; 
-        if(trySwapping(v, {v.x + first_side_down, v.y - 1}))
-            return;
-        if(trySwapping(v, {v.x - first_side_down, v.y - 1}))
-            return;
-    }
     {
         int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
         if(trySwapping(v, {v.x + first_side, v.y})) 
@@ -204,7 +198,7 @@ void CellVar::InitializeProperties() {
             CellVar::properties[static_cast<size_t>(eCellType::Smoke)].update_behaviour(v, grid);
         },
         //colors
-        {clr_t(255, 255, 255) }
+        {clr_t(235, 235, 235) }
     );
     CellVar::properties[static_cast<size_t>(eCellType::Sand)] = CellConstants(
         //powdery
@@ -274,24 +268,6 @@ void CellVar::InitializeProperties() {
         0.f,
         //behaviour
         [](vec2i v, Grid& grid) {
-            auto me = grid.get(v);
-            auto isPowderorSolid = [&](vec2i what) {
-                return (grid.get(what).getProperty().state == eState::Powder || grid.get(what).getProperty().state == eState::Soild) && grid.get(what).type != eCellType::CompressedDirt;
-            };
-            bool isUnsupported = false;
-            if(!me.var.CompressedDirt.isCrumbled) {
-                if(isPowderorSolid(vec2i(v.x + 1, v.y)) || isPowderorSolid(vec2i(v.x - 1, v.y)) ) {
-                    isUnsupported = true;
-                    if(g_rng.Random()<COMPRESSED_DIRT_CRUMBLE_PROBABILITY || (grid.get(v.x + 1, v.y).type != eCellType::CompressedDirt && grid.get(v.x - 1, v.y).type != eCellType::CompressedDirt)) {
-                        me.var.CompressedDirt.isCrumbled = true;
-                        grid.set(v, me);
-                    }
-                }
-            }
-            if(me.var.CompressedDirt.isCrumbled || isUnsupported)  {
-                handleBasicPowder(v, grid);
-                return;
-            }
         },
         //colors
         {clr_t(75, 45, 7), clr_t(60, 40, 5) }
@@ -586,7 +562,7 @@ void CellVar::InitializeProperties() {
 
         },
         //colors
-        {clr_t(90, 40, 10)}
+        {clr_t(133, 94, 66)}
     );
     CellVar::properties[static_cast<size_t>(eCellType::Leaf)] = CellConstants(
         //powdery
