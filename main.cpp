@@ -42,16 +42,17 @@ public:
     void spawnAtBrush(Grid& grid, bool ifEmpty = false, const CellVar* cv = nullptr ) {
         vec2i mouse_pos = getMousePos();
         auto grid_mouse_coords = grid.convert_coords(mouse_pos, p_window_size); 
-        for(int y = -brush_size/2; y < round((float)brush_size/2.f); y++)
-            for(int x = -brush_size/2; x < round((float)brush_size/2.f); x++) {
-                if(grid.inBounds(grid_mouse_coords + vec2i(x, y)) && (grid.get(grid_mouse_coords + vec2i(x, y)).type == eCellType::Air || !ifEmpty)){
-                    if(cv) 
-                        grid.set(grid_mouse_coords + vec2i(x, y), *cv);
-                    else
-                        grid.set(grid_mouse_coords + vec2i(x, y), CellVar(brush_material));
-                }
+        Shape s;
+        s.add(Circle((vec2f)grid_mouse_coords, brush_size));
+        for(auto [x, y] : s.getPoints()) {
+            if(grid.inBounds(vec2i(x, y)) && (grid.get(vec2i(x, y)).type == eCellType::Air || !ifEmpty)){
+                if(cv) 
+                    grid.set(vec2i(x, y), *cv);
+                else
+                    grid.set(vec2i(x, y), CellVar(brush_material));
             }
-    }
+        }
+    };
     void spawnMaterial(Grid& grid, sf::Keyboard::Key k, eCellType type) {
         brush_material = type;
         if(sf::Keyboard::isKeyPressed(k)){

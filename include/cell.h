@@ -20,6 +20,7 @@ enum class eCellType : unsigned char {
     //solids [powders]
     Sand,
     Cobblestone,
+    Rock,
     Dirt,
     CompressedDirt,
     Crystal,
@@ -88,6 +89,7 @@ public:
     Color color;
     //number of updates
     unsigned short move_count = 0;
+    float temp;
     unsigned short age = 0;
 
     static void addReplicatorMap(const char* filename, unsigned char id);
@@ -114,6 +116,12 @@ public:
                 void set(vec2i v) { x = v.x; y = v.y; }
             }Dir;
         }Wood;
+        struct {
+            bool isEdge;
+        }Sand;
+        struct {
+            char isSupported;
+        }Rock;
         struct {
             unsigned char grass_timer;
             bool bgrew_grass;

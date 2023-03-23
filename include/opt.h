@@ -16,6 +16,8 @@
 
 #define DIRT_TO_GRASS_REQ_TIME 120
 
+#define ROCK_HEIGHT 4
+
 #define bREACTION_LAVA_WATER_STEAM true 
 #define bREACTION_LAVA_WATER_COBBLE true 
 

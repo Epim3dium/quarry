@@ -40,6 +40,7 @@ const char* to_str(eCellType type) {
         CASE_RETURN(eCellType::CrumblingStone);
         CASE_RETURN(eCellType::Crystal);
         CASE_RETURN(eCellType::Stone);
+        CASE_RETURN(eCellType::Rock);
         CASE_RETURN(eCellType::Grass);
         CASE_RETURN(eCellType::Seed);
         CASE_RETURN(eCellType::Wood);
@@ -216,7 +217,42 @@ void CellVar::InitializeProperties() {
         //flammability
         0.f,
         //behaviour
-        handleBasicPowder,
+        [](vec2i v, Grid& grid) {
+            const auto isSwappable = [&](const int& otherx, const int& othery)->bool {
+                auto& other_prop = grid.get({otherx, othery}).getProperty(); 
+                return other_prop.state == eState::Liquid || other_prop.state == eState::Gas || 
+                    (other_prop.state == eState::Powder  && other_prop.density < grid.get(v).getProperty().density);
+            };
+            auto isEdge = [&](int otherx, int othery) {
+                return grid.get(otherx, othery).type == eCellType::Sand && grid.get(otherx, othery).var.Sand.isEdge;
+            };
+            if(isSwappable(v.x, v.y - 1)) {
+                grid.swap_at(v, {v.x, v.y -1});
+                return;
+            }
+            int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
+            auto me = grid.get(v);
+            if(isSwappable(v.x + first_side, v.y - 1)) {
+                grid.swap_at(v, {v.x + first_side, v.y - 1});
+                return;
+            } else if(isSwappable(v.x - first_side, v.y - 1)) {
+                grid.swap_at(v, {v.x - first_side, v.y - 1});
+                return;
+            }else if(isEdge(v.x + first_side, v.y - 1) && isSwappable(v.x + first_side, v.y)) {
+                grid.swap_at(v, {v.x + first_side, v.y});
+                return;
+            }else if(isEdge(v.x - first_side, v.y - 1) && isSwappable(v.x - first_side, v.y)) {
+                grid.swap_at(v, {v.x - first_side, v.y});
+                return;
+            }
+            if(!me.var.Sand.isEdge && (isSwappable(v.x - 1, v.y) || isSwappable(v.x + 1, v.y))) {
+                me.var.Sand.isEdge = true;
+                grid.set(v, me);
+            } else if(me.var.Sand.isEdge && !(isSwappable(v.x - 1, v.y) || isSwappable(v.x + 1, v.y))) {
+                me.var.Sand.isEdge = false;
+                grid.set(v, me);
+            }
+        },
         //colors
         {Color(220, 220, 80), Color(250, 250, 40) }
     );
@@ -231,6 +267,58 @@ void CellVar::InitializeProperties() {
         handleBasicPowder,
         //colors
         {Color(150, 150, 150), Color(100, 100, 100) }
+    );
+    CellVar::properties[static_cast<size_t>(eCellType::Rock)] = CellConstants(
+        //powdery
+        eState::Powder,
+        //density
+        2300,
+        //flammability
+        0.f,
+        //behaviour
+        [](vec2i v, Grid& grid) {
+            const auto isSwappable = [&](const int& otherx, const int& othery)->bool {
+                auto& other_prop = grid.get({otherx, othery}).getProperty(); 
+                return other_prop.state == eState::Liquid || other_prop.state == eState::Gas;
+            };
+            auto swapIfPossible = [&](int otherx, int othery)->bool {
+                if(isSwappable(otherx, othery)) {
+                    auto me = grid.get(v);
+                    me.var.Rock.isSupported = 0;
+                    grid.set(v, me);
+                    grid.swap_at(v, {otherx, othery});
+                    return true;
+                }
+                return false;
+            };
+            auto other = grid.get(v.x, v.y - 1);
+            if(other.type == eCellType::Rock && other.var.Rock.isSupported > 0) {
+                auto me = grid.get(v.x, v.y);
+                unsigned char h = other.var.Rock.isSupported - 1;
+                if(me.var.Rock.isSupported != h) {
+                    me.var.Rock.isSupported = h;
+                    grid.set(v, me);
+                }
+                return;
+            }
+            if(swapIfPossible(v.x, v.y - 1))
+                return;
+            int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
+            if(swapIfPossible(v.x + first_side, v.y - 1))
+                return;
+            else if(swapIfPossible(v.x - first_side, v.y - 1))
+                return;
+            else if(!isSwappable(v.x, v.y - 1)) {
+                auto me = grid.get(v.x, v.y);
+                unsigned char h = ROCK_HEIGHT;
+                if(me.var.Rock.isSupported != h) {
+                    me.var.Rock.isSupported = h;
+                    grid.set(v, me);
+                }
+            }
+        },
+        //colors
+        {Color(92, 92, 92), Color(75, 75, 75) }
     );
     CellVar::properties[static_cast<size_t>(eCellType::Dirt)] = CellConstants(
         //powdery
