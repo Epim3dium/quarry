@@ -5,6 +5,7 @@
 #include "grid.hpp"
 #include "opt.h"
 #include "utils.h"
+namespace epi {
 
 //TODO:
 //Cobblestone + water = dirt
@@ -85,6 +86,13 @@ static void handleBasicLiquid(vec2i v, Grid& grid) {
         return;
     {
         int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
+        if(trySwapping(v, {v.x + first_side, v.y - 1})) 
+            return;
+        if(trySwapping(v, {v.x - first_side, v.y - 1})) 
+            return;
+    }
+    {
+        int first_side = g_rng.Random() > 0.5f ? 1 : -1; 
         if(trySwapping(v, {v.x + first_side, v.y})) 
             return;
         if(trySwapping(v, {v.x - first_side, v.y})) 
@@ -133,7 +141,7 @@ void CellVar::InitializeProperties() {
             return;
         },
         //colors
-        {clr_t(10, 20, 50)}
+        {Color(10, 20, 50)}
     );
     CellVar::properties[static_cast<size_t>(eCellType::Smoke)] = CellConstants(
         //powdery
@@ -178,7 +186,7 @@ void CellVar::InitializeProperties() {
             }
         },
         //colors
-        {clr_t(130, 130, 130) }
+        {Color(130, 130, 130) }
     );
     CellVar::properties[static_cast<size_t>(eCellType::Steam)] = CellConstants(
         //powdery
@@ -198,7 +206,7 @@ void CellVar::InitializeProperties() {
             CellVar::properties[static_cast<size_t>(eCellType::Smoke)].update_behaviour(v, grid);
         },
         //colors
-        {clr_t(235, 235, 235) }
+        {Color(235, 235, 235) }
     );
     CellVar::properties[static_cast<size_t>(eCellType::Sand)] = CellConstants(
         //powdery
@@ -210,7 +218,7 @@ void CellVar::InitializeProperties() {
         //behaviour
         handleBasicPowder,
         //colors
-        {clr_t(220, 220, 80), clr_t(250, 250, 40) }
+        {Color(220, 220, 80), Color(250, 250, 40) }
     );
     CellVar::properties[static_cast<size_t>(eCellType::Cobblestone)] = CellConstants(
         //powdery
@@ -222,7 +230,7 @@ void CellVar::InitializeProperties() {
         //behaviour
         handleBasicPowder,
         //colors
-        {clr_t(150, 150, 150), clr_t(100, 100, 100) }
+        {Color(150, 150, 150), Color(100, 100, 100) }
     );
     CellVar::properties[static_cast<size_t>(eCellType::Dirt)] = CellConstants(
         //powdery
@@ -257,7 +265,7 @@ void CellVar::InitializeProperties() {
             handleBasicPowder(v, grid);
         },
         //colors
-        {clr_t(120, 90, 15), clr_t(100, 80, 10) }
+        {Color(120, 90, 15), Color(100, 80, 10) }
     );
     CellVar::properties[static_cast<size_t>(eCellType::CompressedDirt)] = CellConstants(
         //powdery
@@ -268,9 +276,34 @@ void CellVar::InitializeProperties() {
         0.f,
         //behaviour
         [](vec2i v, Grid& grid) {
+            auto me = grid.get(v);
+            //if side hasnt been chosen yet choose it at random
+            auto side = g_rng.Random() > 0.5f ? 1 : -1;
+            if(me.var.CompressedDirt.state == COMPRESSED_DIRT_STATE_SUPPORTED)
+                side = me.var.CompressedDirt.current_side;
+            //assign parent if crystal is under me
+            if(me.var.CompressedDirt.state != COMPRESSED_DIRT_STATE_CRUMBLED && grid.get(v.x + side, v.y).type == eCellType::CompressedDirt) 
+            {
+                auto& parent = grid.get(v.x + side, v.y);
+                //assign right side
+                if(parent.var.CompressedDirt.current_side == side || parent.var.CompressedDirt.current_side == 0) {
+                    if(me.var.CompressedDirt.state == COMPRESSED_DIRT_STATE_SUPPORTED)
+                        return;
+                    me.var.CompressedDirt.state = COMPRESSED_DIRT_STATE_SUPPORTED;
+                    me.var.CompressedDirt.current_side = side;
+                    grid.set(v, me);
+                    return;
+                }
+            }
+            if(me.var.CompressedDirt.state == COMPRESSED_DIRT_STATE_SUPPORTED) {
+                me.var.CompressedDirt.state = COMPRESSED_DIRT_STATE_CRUMBLED;
+                grid.set(v, me);
+            }
+            handleBasicPowder(v, grid);
+            
         },
         //colors
-        {clr_t(75, 45, 7), clr_t(60, 40, 5) }
+        {Color(75, 45, 7), Color(60, 40, 5) }
     );
 #define MAX_CRUMBLING_STONE_PROPAGATION 25
 #define CRUMBLING_STONE_RNG_RANGE 3
@@ -304,7 +337,7 @@ void CellVar::InitializeProperties() {
             }
         },
         //colors
-        {clr_t(45, 45, 60), clr_t(40, 40, 50) }
+        {Color(45, 45, 60), Color(40, 40, 50) }
     );
     CellVar::properties[static_cast<size_t>(eCellType::Crystal)] = CellConstants(
         //powdery
@@ -345,7 +378,7 @@ void CellVar::InitializeProperties() {
             }
         },
         //colors
-        {clr_t(116, 160, 250), clr_t(150, 190, 250), clr_t(120, 120, 220)}
+        {Color(116, 160, 250), Color(150, 190, 250), Color(120, 120, 220)}
     );
     CellVar::properties[static_cast<size_t>(eCellType::Stone)] = CellConstants(
         //powdery
@@ -359,7 +392,7 @@ void CellVar::InitializeProperties() {
             return;
         },
         //colors
-        {clr_t(70, 70, 70)}
+        {Color(70, 70, 70)}
     );
     //liquids keep eating framerate so i need a limiter
     CellVar::properties[static_cast<size_t>(eCellType::Water)] = CellConstants(
@@ -372,7 +405,7 @@ void CellVar::InitializeProperties() {
         //behaviour
         handleBasicLiquid,
         //colors
-        {clr_t(50, 50, 150)}
+        {Color(50, 50, 150)}
         //reaction with lava -> change to smoke
     );
 
@@ -407,7 +440,7 @@ void CellVar::InitializeProperties() {
             }
             handleBasicLiquid(v, grid);
         },
-        {clr_t(220, 90, 30)}
+        {Color(220, 90, 30)}
     );
     CellVar::properties[static_cast<size_t>(eCellType::Acid)] = CellConstants(
         //powdery
@@ -439,7 +472,7 @@ void CellVar::InitializeProperties() {
                 handleBasicLiquid(v, grid);
             }
         },
-        {clr_t(150, 250, 40)}
+        {Color(150, 250, 40)}
         //reactions for acid are included at the end of all types
     );
 
@@ -471,7 +504,7 @@ void CellVar::InitializeProperties() {
             if(grid.get(v.x, v.y - 1).type != eCellType::Grass && !(grid.get(v.x, v.y - 1).type == eCellType::Dirt && grid.get(v.x, v.y - 1).getID() % 255 == grid.get(v).var.Grass.my_dirt_id))
                 grid.set(v, CellVar(eCellType::Air));
         },
-        {clr_t(30, 120, 30), clr_t(35, 130, 35)}
+        {Color(30, 120, 30), Color(35, 130, 35)}
     );
 
     CellVar::properties[static_cast<size_t>(eCellType::Seed)] = CellConstants(
@@ -496,7 +529,7 @@ void CellVar::InitializeProperties() {
             }
         },
         //colors
-        {clr_t(10, 100, 10)}
+        {Color(10, 100, 10)}
     );
     CellVar::properties[static_cast<size_t>(eCellType::Wood)] = CellConstants(
         //powdery
@@ -562,7 +595,7 @@ void CellVar::InitializeProperties() {
 
         },
         //colors
-        {clr_t(133, 94, 66)}
+        {Color(133, 94, 66)}
     );
     CellVar::properties[static_cast<size_t>(eCellType::Leaf)] = CellConstants(
         //powdery
@@ -594,7 +627,7 @@ void CellVar::InitializeProperties() {
 
         },
         //colors
-        {clr_t(50, 150, 50), clr_t(50, 170, 50), clr_t(50, 200, 50)}
+        {Color(50, 150, 50), Color(50, 170, 50), Color(50, 200, 50)}
     );
 //determines flame size
     CellVar::properties[static_cast<size_t>(eCellType::Fire)] = CellConstants(
@@ -606,7 +639,7 @@ void CellVar::InitializeProperties() {
         //behaviour
         [](vec2i v, Grid& grid) {
             auto me = grid.get(v);
-            const std::vector<clr_t> mid_colors = { clr_t(226, 88, 34), clr_t(128, 9, 9) };
+            const std::vector<Color> mid_colors = { Color(226, 88, 34), Color(128, 9, 9) };
 
             //spreading fire 
             {
@@ -640,7 +673,7 @@ void CellVar::InitializeProperties() {
                     }
                 }
                 //changing colors
-                clr_t cur = me.color;
+                Color cur = me.color;
                 for(int i = 1; i < mid_colors.size() + 1; i++) {
                     //create 'sectors' for each color of the flame with FIRE_COLOR_BLEND_AREA_HEIGHT as max blend height between colors
                     if(me.age + g_rng.Random<int>(0, FIRE_COLOR_BLEND_AREA_HEIGHT) >= MIN_FIRE_LIFETIME / mid_colors.size() * i) {
@@ -657,7 +690,7 @@ void CellVar::InitializeProperties() {
             }
         },
         //color will be changing through lifetime
-        {clr_t(253,207,88)}
+        {Color(253,207,88)}
     );
 
     CellVar::properties[static_cast<size_t>(eCellType::Replicator)] = CellConstants(
@@ -699,7 +732,7 @@ void CellVar::InitializeProperties() {
             return;
         },
         //colors
-        {clr_t(255, 0, 255)}
+        {Color(255, 0, 255)}
     );
     CellVar::properties[static_cast<size_t>(eCellType::Bedrock)] = CellConstants(
         //powdery
@@ -713,6 +746,7 @@ void CellVar::InitializeProperties() {
             return;
         },
         //colors
-        {clr_t(50, 50, 50)}
+        {Color(50, 50, 50)}
     );
+}
 }

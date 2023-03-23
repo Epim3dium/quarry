@@ -3,16 +3,16 @@
 
 #include "SFML/Graphics/RenderTarget.hpp"
 #include "SFML/Graphics/Texture.hpp"
+#include "col_utils.hpp"
 #include "grid.hpp"
-#include "timer.h"
-#include "sprite.h"
 #include "opt.h"
+namespace epi {
 
 Grid::Grid(int w, int h, const std::vector<CellVar>& vec) : m_width(w), m_height(h), m_section_list(w / UPDATE_SEG_W * h / UPDATE_SEG_H), m_plane(vec){
     if(vec.size() != w * h)
         m_plane = std::vector<CellVar>(w * h, CellVar(eCellType::Air));
     m_Buffer.create(w, h, CellVar::properties[static_cast<size_t>(eCellType::Air)].colors.front());
-    setViewWindow({{0, 0}, {w, h}});
+    setViewWindow({{0, 0}, {static_cast<float>(w), static_cast<float>(h)}});
 }
 void Grid::set(int x, int y, const CellVar& cv) {
     int id_x = x / UPDATE_SEG_W;
@@ -36,7 +36,7 @@ void Grid::set(int x, int y, const CellVar& cv) {
         exit(1);
     m_plane[m_idx(x, y)] = cv;
 }
-void Grid::updateSegment(vec2i min, vec2i max) {
+void Grid::m_updateRect(vec2f min, vec2f max) {
     //high cap has to be 1 less so that max will not be equal min
     min.x = std::clamp<int>(min.x, 0, m_width - 1);
     min.y = std::clamp<int>(min.y, 0, m_height - 1);
@@ -44,7 +44,7 @@ void Grid::updateSegment(vec2i min, vec2i max) {
     max.x = std::clamp<int>(max.x, min.x + 1, m_width);
     max.y = std::clamp<int>(max.y, min.y + 1, m_height);
     if(debug.showUpdated && debug.isActive)
-        m_debugAABBUpdate.push_back({min, max});
+        m_debugAABBUpdate.push_back({(vec2f)min, (vec2f)max});
 
     //other sides to prevent weird lags
     bool left_to_right = tick_passed_total % 2;
@@ -62,19 +62,18 @@ void Grid::updateSegment(vec2i min, vec2i max) {
     if(left_to_right) {
         VERT_STYLE 
             LEFT_RIGHT
-                updateCell(x, y);
+                m_updateCell(x, y);
     } else {
         VERT_STYLE 
            RIGHT_LEFT 
-                updateCell(x, y);
+                m_updateCell(x, y);
     }
 }
 void Grid::m_analyzeRow(int id_y) {
     int id_x = 0;
     bool last_updated = false;
-    AABBi cur_aabb = {{0xffffff, 0xffffff}, {}};
+    AABB cur_aabb = {{0xffffff, 0xffffff}, {}};
     while(id_x < m_width / UPDATE_SEG_W) {
-        //m_updateSection(id_x + id_y * m_width / UPDATE_SEG_W);
         do {
             size_t index = id_x + id_y * m_width / UPDATE_SEG_W;
             bool shouldUpdate = m_section_list[index].toUpdate;
@@ -85,7 +84,7 @@ void Grid::m_analyzeRow(int id_y) {
             }
             if(!shouldUpdate) {
                 if(last_updated) {
-                    updateSegment(cur_aabb.min, cur_aabb.max);
+                    m_updateRect(cur_aabb.min, cur_aabb.max);
                 }
                 last_updated = false;
                 break;
@@ -93,14 +92,14 @@ void Grid::m_analyzeRow(int id_y) {
 
             int bl_x = (index * UPDATE_SEG_W) % m_width;
             int bl_y = (index * UPDATE_SEG_W) / m_width * UPDATE_SEG_H;
-            AABBi seg = {vec2i(bl_x, bl_y), vec2i(bl_x + UPDATE_SEG_W, bl_y + UPDATE_SEG_H)};
+            AABB seg = {vec2f(bl_x, bl_y), vec2f(bl_x + UPDATE_SEG_W, bl_y + UPDATE_SEG_H)};
 
             auto ext_ViewWindow = m_ViewWindow;
             auto s = ext_ViewWindow.size();
             ext_ViewWindow.min -= s;
             ext_ViewWindow.max += s;
 
-            if(AABBvAABB(seg, ext_ViewWindow)) {
+            if(isOverlappingAABBAABB(seg, ext_ViewWindow)) {
                 if(last_updated)  {
                     cur_aabb.max = seg.max;
                 }else  {
@@ -109,16 +108,15 @@ void Grid::m_analyzeRow(int id_y) {
                     last_updated = true;
                 }
                 m_SegmentsToRerender.push_back(seg);
-                //m_updateSegment(seg.min, seg.max);
             }
         }while(0);
         //
         id_x++;
     }
     if(last_updated)
-        updateSegment(cur_aabb.min, cur_aabb.max);
+        m_updateRect(cur_aabb.min, cur_aabb.max);
 }
-void Grid::updateCell(int x, int y) {
+void Grid::m_updateCell(int x, int y) {
     if(get(x, y).type == eCellType::Air)
         return;
     if(get(x, y).last_tick_updated >= tick_passed_total) {
@@ -129,13 +127,12 @@ void Grid::updateCell(int x, int y) {
         set(x, y, eCellType::Air);
         return;
     }
-    auto& cur_prop = get(x, y).getProperty();
     //using m_idx to bypass setting and causing unnecessary checks
     m_plane[m_idx(x, y)].last_tick_updated = tick_passed_total;
     m_plane[m_idx(x, y)].age++;
-    cur_prop.update_behaviour({x, y}, *this);
+    get(x, y).getProperty().update_behaviour({x, y}, *this);
 }
-void Grid::updateChangedSegments() {
+void Grid::update() {
     tick_passed_total ++;
 #if THREADED_UPDATE
     size_t thread_c = std::thread::hardware_concurrency();
@@ -145,7 +142,7 @@ void Grid::updateChangedSegments() {
     //if((i % (m_width / UPDATE_SEG_)) % 2 == 0)
     bool side_x = tick_passed_total % 2;
     //bool side_y = (tick_passed_total / 2) % 2;
-    bool side_y = 0;
+    bool side_y = 1;
 
     std::vector<std::thread> workers;
     auto analyzeOnlyDivisible = [&](int id, bool fhalf) {
@@ -165,33 +162,26 @@ void Grid::updateChangedSegments() {
         }
     };
     for(int half = 0; half < 2; half++) {
+#if THREADED_UPDATE
         for(int i = 0; i < thread_c; i++)
             workers.push_back(std::thread(analyzeOnlyDivisible, i, half));
         for(auto& w : workers)
             if(w.joinable())
-            w.join();
+                w.join();
+#else
+        analyzeOnlyDivisible(0, half);
+#endif
     }
-    /*
-    auto analyzeSections = [&](bool even_x, bool odd_x, bool even_y, bool odd_y) {
-        }
-    };
-    */
 };
-void Grid::redrawChangedSegments() {
+void Grid::redraw() {
 #if bREDRAW_CHANGED_ONLY 
     for(auto& seg : m_SegmentsToRerender) {
-        redrawSegment(seg);
+        m_redrawRect(seg);
     }
 #else
     redrawSegment(getViewWindow());
 #endif
     m_SegmentsToRerender.clear();
-    for(auto& v : m_PixelsToClean) {
-        if(!inView(v.x, v.y))
-            continue;
-        m_Buffer.setPixel(v.x - m_ViewWindow.min.x, m_ViewWindow.size().y - (v.y - m_ViewWindow.min.y) - 1, get(v).color);
-    }
-    m_PixelsToClean.clear();
 }
 
 //redraw window defines what segment should be redrawn and view_window the size of full window that should fit on the screen
@@ -221,20 +211,10 @@ rw.draw(line, 2, sf::Lines);\
 }
     DEBUG_DRAW_AABB(m_debugAABBDraw, debug.draw_clr, vec2f(0, 0))
     DEBUG_DRAW_AABB(m_debugAABBUpdate, debug.update_clr, vec2f(2, 2))
-    if(debug.showDraws)
-        for(auto v : m_PixelsToClean) {
-            v -= m_ViewWindow.min;
-            float r = 0.3f * std::min(ratio.x, ratio.y);
-            sf::CircleShape c(r);
-            c.setFillColor(debug.draw_clr);
-            v.y += 1;
-            c.setPosition(vec2f(v.x * ratio.x + r / 2, rw.getSize().y - v.y * ratio.y + r / 2));
-            rw.draw(c);
-        }
     m_debugAABBUpdate.clear();
     m_debugAABBDraw.clear();
 }
-void Grid::redrawSegment(AABBi redraw_window) {
+void Grid::m_redrawRect(AABB redraw_window) {
     redraw_window.min.x = std::clamp<int>(redraw_window.min.x, m_ViewWindow.min.x, m_ViewWindow.max.x - 1);
     redraw_window.min.y = std::clamp<int>(redraw_window.min.y, m_ViewWindow.min.y, m_ViewWindow.max.y - 1);
 
@@ -256,24 +236,13 @@ void Grid::redrawSegment(AABBi redraw_window) {
 }
 void Grid::render(sf::RenderTexture& rw, sf::Shader* frag_shader) {
     sf::Texture tex;
-    tex.loadFromImage(m_Buffer);
+    tex.loadFromImage(m_Buffer, {(vec2i)m_ViewWindow.min, (vec2i)m_ViewWindow.size()});
     sf::Sprite spr(tex);
     spr.setPosition(0, 0);
     rw.draw(spr, frag_shader);
 
     if(debug.isActive)
         m_drawDebug(rw);
-}
-void Grid::drawCellAt(int x, int y, clr_t color) {
-    if(!inView(x, y))
-        return;
-    m_Buffer.setPixel(x - m_ViewWindow.min.x, m_ViewWindow.size().y - (y - m_ViewWindow.min.y) - 1, color);
-}
-void Grid::drawCellAtClean(int x, int y, clr_t color) {
-    if(!inView(x, y))
-        return;
-    m_Buffer.setPixel(x - m_ViewWindow.min.x, m_ViewWindow.size().y - (y - m_ViewWindow.min.y) - 1, color);
-    m_PixelsToClean.push_back({x, y});
 }
 vec2i Grid::convert_coords(vec2i mouse_pos, vec2f window_size) {
     vec2f size = window_size;
@@ -292,7 +261,7 @@ vec2i Grid::convert_coords(vec2i mouse_pos, vec2f window_size) {
     pos_y += m_ViewWindow.min.y;
     return {pos_x, pos_y};
 }
-void Grid::mergeAt(const Grid& other, AABBi rect, vec2i fixed) {
+void Grid::mergeAt(const Grid& other, AABB rect, vec2f fixed) {
     if(rect.min.x == 0 && rect.max.x == -1) {
         rect.min.x = 0;
         rect.max.x = getWidth();
@@ -313,7 +282,7 @@ void Grid::mergeAt(const Grid& other, AABBi rect, vec2i fixed) {
                 set(x, y, other.get(x - rect.min.x + fixed.x, y - rect.min.y + fixed.y));
         }
     }
-    updateSegment(rect.min, rect.max);
+    m_updateRect(rect.min, rect.max);
 }
 //file structure:
 //width height
@@ -340,7 +309,7 @@ void Map::importFromFile(const char* filename) {
     in.read((char*)(void*)&data[0], sizeof(CellVar) * w * h);
     return;
 }
-void Grid::importFromMap(AABBi seg, const Map& m) {
+void Grid::importFromMap(AABB seg, const Map& m) {
     for(int y = seg.min.y; y < seg.max.y && y < m_height; y++) {
         for(int x = seg.min.x; x < seg.max.x && x < m_width; x++) {
             if(y - seg.min.y < m.h && x - seg.min.x < m.w)
@@ -348,7 +317,7 @@ void Grid::importFromMap(AABBi seg, const Map& m) {
         }
     }
 }
-void Grid::importFromFile(const char* filename, AABBi seg) {
+void Grid::importFromFile(const char* filename, AABB seg) {
     Map m;
     m.importFromFile(filename);
     importFromMap(seg, m);
@@ -358,7 +327,7 @@ void Grid::importFromFile(const char* filename) {
     m.importFromFile(filename);
     *this = Grid(m.w, m.h, m.data);
 }
-Map Grid::exportToMap(AABBi seg) {
+Map Grid::exportToMap(AABB seg) {
     Map m;
     m.w = seg.size().x;
     m.h = seg.size().y;
@@ -370,7 +339,7 @@ Map Grid::exportToMap(AABBi seg) {
     }
     return m;
 }
-void Grid::exportToFile(const char* filename, AABBi seg) {
+void Grid::exportToFile(const char* filename, AABB seg) {
     exportToMap(seg).exportToFile(filename);
 }
 void Grid::exportToFile(const char* filename) {
@@ -379,4 +348,5 @@ void Grid::exportToFile(const char* filename) {
     m.h = m_height;
     m.data = m_plane;
     m.exportToFile(filename);
+}
 }

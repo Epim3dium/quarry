@@ -4,6 +4,7 @@
 
 #include "SFML/Graphics/RenderTarget.hpp"
 #include "SFML/Graphics/RenderWindow.hpp"
+#include "SFML/Graphics/Sprite.hpp"
 #include "SFML/Graphics/Texture.hpp"
 #include "cell.h"
 #include "imgui.h"
@@ -13,11 +14,8 @@
 #include "utils.h"
 #include "grid.hpp"
 #include "timer.h"
-#include "sprite.h"
 #include "shape.h"
-#include "rigidbody.h"
 #include "quarry.h"
-#include "entity.h"
 
 #define GWH 512
 #define GWW 512
@@ -26,8 +24,7 @@
 #define WW (WH * GWH/GWW)
 
 
-const static QuarrySprite g_player_sprite("./assets/player.png");
-const static QuarrySprite g_camera_sprite("./assets/camera.png");
+using namespace epi;
 
 
 class Demo : public QuarryApp {
@@ -163,7 +160,17 @@ public:
         }
     }
     void draw(sf::RenderTarget& rw, const Grid& grid) override {
-        g_player_sprite.drawAt({100, 100}, rw, grid);
+        static sf::Texture test_tex;
+        static bool initialized = false;
+        if(!initialized) {
+            test_tex.loadFromFile("assets/player.png");
+            initialized = true;
+        }
+        sf::Sprite spr;
+        spr.setTexture(test_tex);
+        spr.setPosition({100, 100});
+        rw.draw(spr);
+        //g_player_sprite.drawAt({100, 100}, rw, grid);
     }
     bool setup(Grid& grid) override {
         //bindFragShader("assets/light_shader.frag");
@@ -244,7 +251,7 @@ public:
             }, eKeyHookState::isPressed);
         addKeyHook(sf::Keyboard::Z, 
             [&]() {
-                AABBi new_view;
+                AABB new_view;
 
                 vec2i this_mouse_pos = getMousePos();
                 this_mouse_pos= grid.convert_coords(this_mouse_pos, p_window_size);
@@ -257,7 +264,7 @@ public:
                 new_view.max.x = new_view.min.x + max_size;
                 new_view.max.y = new_view.min.y + max_size;
 
-                new_view.min -= vec2i(1, 1);
+                new_view.min -= vec2f(1, 1);
 
                 grid.setViewWindow(new_view);
                 last_mouse_pos.x = -1;

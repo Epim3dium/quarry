@@ -1,19 +1,33 @@
 #pragma once
 #include "grid.hpp"
 #include "utils.h"
+#include "types.hpp"
+#include <set>
 
+namespace epi {
 class Shape {
-    std::vector<vec2i> m_buffer;
+    std::set<long long int> m_buffer;
+    static long long int convert(vec2i v) {
+        return *reinterpret_cast<long long int*>(&v);
+    }
+    static vec2i convert(long long int i) {
+        return *reinterpret_cast<vec2i*>(&i);
+    }
     public:
-    inline const std::vector<vec2i>& getPoints() const { return m_buffer; }
+    std::vector<vec2i> getPoints() const { 
+        std::vector<vec2i> r;
+        for(auto i : m_buffer)
+            r.push_back(convert(i));
+        return r;
+    }
 
     inline void add(vec2i v) {
-        m_buffer.push_back(v);
+        m_buffer.insert(convert(v));
     }
-    void add(Rayf ray);
-    void add(AABBf aabb);
-
-    void draw(Grid& g, clr_t clr);
+    void add(epi::Ray ray);
+    void add(epi::AABB aabb);
+    void add(epi::Circle circ);
 
     Shape() {}
 };
+}

@@ -6,6 +6,7 @@
 #include "imgui.h"
 #include "grid.hpp"
 
+namespace epi {
 enum class eKeyHookState {
     isPressed,
     isReleased
@@ -21,12 +22,13 @@ class QuarryApp {
 
     std::map<sf::Keyboard::Key,std::function<void(void)> > pressed_keypress_hooks;
     std::map<sf::Keyboard::Key,std::function<void(void)> > released_keypress_hooks;
-    window_t window;
+    Window window;
     sf::RenderTexture grid_window;
+    void m_DrawGridInWindow(Grid& grid);
 
 protected:
     sf::Shader p_frag_shader;
-    clr_t p_bg_color = clr_t(5, 10, 25);
+    Color p_bg_color = Color(5, 10, 25);
     void bindFragShader(const char* filename);
 
     bool p_isActive = true;
@@ -64,3 +66,4 @@ public:
     ~QuarryApp() { cleanup(); }
     QuarryApp(vec2i grid_size, vec2f win_resolution);
 };
+}

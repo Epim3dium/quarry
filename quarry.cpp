@@ -1,9 +1,12 @@
 #include "quarry.h"
 #include "SFML/Window/VideoMode.hpp"
+#include "cell.h"
 #include "imgui.h"
 #include "imgui-SFML.h"
 
 #define CONSOLAS_PATH "assets/Consolas.ttf"
+namespace epi {
+
 static void setupImGuiFont() {
     sf::Font consolas;
     if (!consolas.loadFromFile(CONSOLAS_PATH)) {
@@ -19,6 +22,20 @@ static void setupImGuiFont() {
     
     ImFont* font = io.Fonts->AddFontFromFileTTF(CONSOLAS_PATH, 24.f);
     ImGui::SFML::UpdateFontTexture();
+}
+void QuarryApp::m_DrawGridInWindow(Grid& grid) {
+    grid.render(grid_window, &p_frag_shader);
+    draw(grid_window, grid);
+    sf::Sprite spr;
+    auto& tex = grid_window.getTexture();
+    spr.setTexture(tex);
+    auto half_size = (vec2f)tex.getSize() / 2.f;
+    spr.setPosition({0, 0});
+    spr.setOrigin(half_size);
+    vec2f ratio = vec2f((float)window.getSize().x / grid.getViewWindow().size().x, -(float)window.getSize().y / grid.getViewWindow().size().y);
+    spr.setScale(ratio);
+    spr.setPosition(half_size.x * ratio.x, -half_size.y * ratio.y);
+    window.draw(spr);
 }
 void QuarryApp::run() {
     Grid grid(p_grid_size.x, p_grid_size.y);
@@ -48,28 +65,18 @@ void QuarryApp::run() {
         }
         //game loop
 
-        grid.redrawChangedSegments();
+        grid.redraw();
 
         ImGui::SFML::Update(window, ImGuiClock.restart());
         update(grid);
 
         //if grid updating in enabled
         if(p_isUpdating) {
-            grid.updateChangedSegments();
+            grid.update();
         }
+
         window.clear(p_bg_color);
-        grid.render(grid_window, &p_frag_shader);
-        draw(grid_window, grid);
-        sf::Sprite spr;
-        auto& tex = grid_window.getTexture();
-        spr.setTexture(tex);
-        auto half_size = (vec2f)tex.getSize() / 2.f;
-        spr.setPosition({0, 0});
-        spr.setOrigin(half_size);
-        vec2f ratio = vec2f((float)window.getSize().x / tex.getSize().x, -(float)window.getSize().y / tex.getSize().y);
-        spr.setScale(ratio);
-        spr.setPosition(half_size.x * ratio.x, -half_size.y * ratio.y);
-        window.draw(spr);
+        m_DrawGridInWindow(grid);
 
         ImGui::SFML::Render(window);
         {
@@ -102,4 +109,5 @@ QuarryApp::QuarryApp(vec2i grid_size_, vec2f win_resolution)
 
     ImGui::SFML::Init(window);
     setupImGuiFont();
+}
 }

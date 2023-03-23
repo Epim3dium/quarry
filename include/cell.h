@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include <functional>
 
+namespace epi {
 class Grid;
 class Map;
 
@@ -58,10 +59,10 @@ struct CellConstants {
     int density;
     float flammability;
     std::function<void(vec2i, Grid&)> update_behaviour;
-    std::vector<clr_t> colors;
+    std::vector<Color> colors;
 
     CellConstants() {}
-    CellConstants(eState state_of_matter, int density_, float flammability_, std::function<void(vec2i, Grid&)> update_func_, std::initializer_list<clr_t> colors_) 
+    CellConstants(eState state_of_matter, int density_, float flammability_, std::function<void(vec2i, Grid&)> update_func_, std::initializer_list<Color> colors_) 
         : state(state_of_matter), density(density_), flammability(flammability_), update_behaviour( update_func_), colors(colors_) {}
 };
 
@@ -84,7 +85,7 @@ public:
     //if not working means you havent called InitializeProperties()
 
     eCellType type;
-    clr_t color;
+    Color color;
     //number of updates
     unsigned short move_count = 0;
     unsigned short age = 0;
@@ -118,7 +119,9 @@ public:
             bool bgrew_grass;
         }Dirt;
         struct {
-            char CurSide;
+            char current_side;
+            char state;
+            char parent_id;
         }CompressedDirt;
         struct {
             unsigned char lvl;
@@ -151,3 +154,4 @@ public:
     friend VarUnion;
     static void InitializeProperties();
 };
+}

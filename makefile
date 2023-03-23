@@ -1,9 +1,9 @@
 CC=clang++
-DEPS=$(wildcard include/*.h)
+DEPS=$(wildcard include/*.h) $(wildcard include/*.hpp)
 
 CFLAGS=@compile_flags.txt
 
-OBJ=main.o utils.o cell.o grid.o quarry.o sprite.o shape.o rigidbody.o
+OBJ=main.o utils.o cell.o grid.o quarry.o shape.o types.o col_utils.o
 
 %.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) -framework openGL
