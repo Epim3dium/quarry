@@ -125,11 +125,9 @@ public:
             static std::string filename = "test.bin";
             ImGui::Text("filename: \"%s\"", filename.c_str());
             if(ImGui::Button("export")) {
-                std::cin >> filename;
                 grid.exportToFile(filename.c_str());
             }
             if(ImGui::Button("import")) {
-                std::cin >> filename;
                 auto tmp_grid = Grid(1, 1);
                 tmp_grid.importFromFile(filename.c_str());
                 grid.mergeAt(tmp_grid);

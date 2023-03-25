@@ -129,7 +129,7 @@ void Grid::m_updateCell(int x, int y) {
     }
     //using m_idx to bypass setting and causing unnecessary checks
     m_plane[m_idx(x, y)].last_tick_updated = tick_passed_total;
-    m_plane[m_idx(x, y)].age++;
+    //m_plane[m_idx(x, y)].age++;
     get(x, y).getProperty().update_behaviour({x, y}, *this);
 }
 void Grid::update() {

@@ -343,14 +343,15 @@ void CellVar::InitializeProperties() {
                     auto me = grid.get(v);
                     me.var.Dirt.bgrew_grass = true;
                     grid.set(v, me);
-                } else {
-                    //age the dirt
-                    auto me = grid.get(v);
-                    me.var.Dirt.grass_timer += 1;
-                    grid.set(v, me);
                 }
             }
+            auto my_id = grid.get(v).id;
             handleBasicPowder(v, grid);
+            if(my_id == grid.get(v).id) {
+                auto me = grid.get(v);
+                me.var.Dirt.grass_timer += 1;
+                grid.set(v, me);
+            }
         },
         //colors
         {Color(120, 90, 15), Color(100, 80, 10) }
@@ -753,9 +754,9 @@ void CellVar::InitializeProperties() {
             //if fire is just normal floaty fire
             }else {
                 //slow deprication
-                if(me.age >= MIN_FIRE_LIFETIME) {
+                if(me.var.Fire.age >= MIN_FIRE_LIFETIME) {
                     //the older the fire particle the more probable it is to annihilate
-                    if(g_rng.Random() < Remap<int, float>(MIN_FIRE_LIFETIME, MAX_FIRE_LIFETIME, 0.f, 1.f).Convert(me.age)){
+                    if(g_rng.Random() < Remap<int, float>(MIN_FIRE_LIFETIME, MAX_FIRE_LIFETIME, 0.f, 1.f).Convert(me.var.Fire.age)){
                         grid.set(v, g_rng.Random() < SMOKE_CHANCE ? eCellType::Smoke : eCellType::Air);
                         return;
                     }
@@ -764,15 +765,14 @@ void CellVar::InitializeProperties() {
                 Color cur = me.color;
                 for(int i = 1; i < mid_colors.size() + 1; i++) {
                     //create 'sectors' for each color of the flame with FIRE_COLOR_BLEND_AREA_HEIGHT as max blend height between colors
-                    if(me.age + g_rng.Random<int>(0, FIRE_COLOR_BLEND_AREA_HEIGHT) >= MIN_FIRE_LIFETIME / mid_colors.size() * i) {
+                    if(me.var.Fire.age + g_rng.Random<int>(0, FIRE_COLOR_BLEND_AREA_HEIGHT) >= MIN_FIRE_LIFETIME / mid_colors.size() * i) {
                         me.color = mid_colors[i - 1];
                         continue;
                     } 
                     break;
                 }
-                if(cur != me.color) {
-                    grid.set(v, me);
-                }
+                me.var.Fire.age++;
+                grid.set(v, me);
                 //movement behaviour
                 CellVar::properties[static_cast<size_t>(eCellType::Smoke)].update_behaviour(v, grid);
             }

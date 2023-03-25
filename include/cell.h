@@ -89,8 +89,6 @@ public:
     Color color;
     //number of updates
     unsigned short move_count = 0;
-    float temp;
-    unsigned short age = 0;
 
     static void addReplicatorMap(const char* filename, unsigned char id);
     union VarUnion {
@@ -104,6 +102,7 @@ public:
         }Replicator;
         struct {
             bool isSource;
+            unsigned char age;
         }Fire;
         //everything that uses sand update behaviour
         struct {
@@ -151,7 +150,7 @@ public:
         return properties[static_cast<size_t>(type)];
     }
     CellVar(eCellType type_) 
-        : type(type_), id(m_getNextID()), age(0), move_count(0), last_tick_updated(0)
+        : type(type_), id(m_getNextID()), move_count(0), last_tick_updated(0)
     {
         std::memset(&var, 0, sizeof(VarUnion));
 
